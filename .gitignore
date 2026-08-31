@@ -1,0 +1,20 @@
+node_modules/
+dist/
+build/
+coverage/
+.env
+.env.local
+*.log
+*.tsbuildinfo
+.DS_Store
+
+# Prisma
+server/prisma/migrations/**/migration.sql.bak
+
+# Vite
+web/dist/
+
+# Editors
+.vscode/*
+!.vscode/extensions.json
+.idea/

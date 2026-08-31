@@ -1,0 +1,24 @@
+{
+  "name": "splitwise-lite",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "workspaces": [
+    "server",
+    "web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=server & npm run dev --workspace=web",
+    "check": "npm run lint && npm run check --workspace=server && npm run check --workspace=web && npm run test --workspace=server",
+    "lint": "eslint .",
+    "test": "npm run test --workspace=server"
+  },
+  "devDependencies": {
+    "eslint": "^9.15.0",
+    "@eslint/js": "^9.15.0",
+    "typescript-eslint": "^8.15.0",
+    "prettier": "^3.3.3",
+    "eslint-config-prettier": "^9.1.0",
+    "globals": "^15.12.0"
+  }
+}

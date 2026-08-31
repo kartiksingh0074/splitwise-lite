@@ -1,0 +1,12 @@
+// Data models are added starting Phase 1. This file intentionally has no
+// models yet — Phase 0 only proves the toolchain (client generation, an
+// empty migration) works end to end.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
