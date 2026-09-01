@@ -17,7 +17,11 @@ model User {
   avatarUrl    String?
   createdAt    DateTime  @default(now())
 
-  refreshTokens RefreshToken[]
+  refreshTokens        RefreshToken[]
+  groupsCreated        Group[]
+  groupMemberships     GroupMember[]
+  groupInvitesCreated  GroupInvite[] @relation("GroupInviteCreatedBy")
+  groupInvitesUsed     GroupInvite[] @relation("GroupInviteUsedBy")
 }
 
 model RefreshToken {
@@ -30,4 +34,49 @@ model RefreshToken {
   createdAt DateTime  @default(now())
 
   @@index([userId])
+}
+
+enum GroupRole {
+  OWNER
+  MEMBER
+}
+
+model Group {
+  id           String    @id @db.Uuid
+  name         String
+  baseCurrency String    @db.Char(3)
+  createdById  String    @db.Uuid
+  createdBy    User      @relation(fields: [createdById], references: [id])
+  createdAt    DateTime  @default(now())
+  archivedAt   DateTime?
+
+  members GroupMember[]
+  invites GroupInvite[]
+}
+
+model GroupMember {
+  groupId  String    @db.Uuid
+  group    Group     @relation(fields: [groupId], references: [id])
+  userId   String    @db.Uuid
+  user     User      @relation(fields: [userId], references: [id])
+  role     GroupRole
+  joinedAt DateTime  @default(now())
+  leftAt   DateTime?
+
+  @@id([groupId, userId])
+}
+
+model GroupInvite {
+  id          String    @id @db.Uuid
+  groupId     String    @db.Uuid
+  group       Group     @relation(fields: [groupId], references: [id])
+  code        String    @unique
+  createdById String    @db.Uuid
+  createdBy   User      @relation("GroupInviteCreatedBy", fields: [createdById], references: [id])
+  expiresAt   DateTime
+  usedById    String?   @db.Uuid
+  usedBy      User?     @relation("GroupInviteUsedBy", fields: [usedById], references: [id])
+  createdAt   DateTime  @default(now())
+
+  @@index([groupId])
 }

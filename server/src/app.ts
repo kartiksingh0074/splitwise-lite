@@ -6,6 +6,8 @@ import { cors } from "./middleware/cors.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { authRouter } from "./modules/auth/routes.js";
 import { usersRouter } from "./modules/users/routes.js";
+import { groupsRouter } from "./modules/groups/routes.js";
+import { inviteRouter } from "./modules/groups/inviteRoutes.js";
 
 export function createApp() {
   const app = express();
@@ -26,6 +28,8 @@ export function createApp() {
 
   app.use("/api/v1/auth", authRouter);
   app.use("/api/v1/users", usersRouter);
+  app.use("/api/v1/groups", groupsRouter);
+  app.use("/api/v1/invites", inviteRouter);
 
   app.use((req, res) => {
     res.status(404).json({
