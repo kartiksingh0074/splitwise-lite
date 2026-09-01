@@ -4,6 +4,8 @@ import { logger } from "./config/logger.js";
 import { requestId } from "./middleware/requestId.js";
 import { cors } from "./middleware/cors.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import { authRouter } from "./modules/auth/routes.js";
+import { usersRouter } from "./modules/users/routes.js";
 
 export function createApp() {
   const app = express();
@@ -21,6 +23,9 @@ export function createApp() {
   app.get("/api/v1/health", (_req, res) => {
     res.status(200).json({ status: "ok" });
   });
+
+  app.use("/api/v1/auth", authRouter);
+  app.use("/api/v1/users", usersRouter);
 
   app.use((req, res) => {
     res.status(404).json({

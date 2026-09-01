@@ -1,12 +1,33 @@
-// Data models are added starting Phase 1. This file intentionally has no
-// models yet — Phase 0 only proves the toolchain (client generation, an
-// empty migration) works end to end.
-
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [citext]
+}
+
+model User {
+  id           String    @id @db.Uuid
+  email        String    @unique @db.Citext
+  name         String
+  passwordHash String
+  avatarUrl    String?
+  createdAt    DateTime  @default(now())
+
+  refreshTokens RefreshToken[]
+}
+
+model RefreshToken {
+  id        String    @id @db.Uuid
+  userId    String    @db.Uuid
+  user      User      @relation(fields: [userId], references: [id])
+  tokenHash String    @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
 }

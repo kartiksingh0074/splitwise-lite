@@ -8,6 +8,7 @@ const envSchema = z.object({
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
   WEB_ORIGIN: z.string().default("http://localhost:5173"),
+  JWT_ACCESS_SECRET: z.string().min(32),
 });
 
 export const env = envSchema.parse(process.env);

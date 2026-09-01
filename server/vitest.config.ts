@@ -9,6 +9,8 @@ export default defineConfig({
       LOG_LEVEL: "silent",
       PORT: "4000",
       WEB_ORIGIN: "http://localhost:5173",
+      JWT_ACCESS_SECRET: "test-only-secret-not-for-real-use-32chars-min",
     },
+    setupFiles: ["./tests/setup.ts"],
   },
 });

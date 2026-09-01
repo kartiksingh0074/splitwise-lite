@@ -10,9 +10,13 @@
     "check": "tsc -b --noEmit"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.9.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.28.0"
+    "react-hook-form": "^7.87.0",
+    "react-router-dom": "^6.28.0",
+    "zod": "^4.5.4",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@types/react": "^18.3.12",
