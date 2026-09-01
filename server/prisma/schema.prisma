@@ -20,8 +20,14 @@ model User {
   refreshTokens        RefreshToken[]
   groupsCreated        Group[]
   groupMemberships     GroupMember[]
-  groupInvitesCreated  GroupInvite[] @relation("GroupInviteCreatedBy")
-  groupInvitesUsed     GroupInvite[] @relation("GroupInviteUsedBy")
+  groupInvitesCreated  GroupInvite[]  @relation("GroupInviteCreatedBy")
+  groupInvitesUsed     GroupInvite[]  @relation("GroupInviteUsedBy")
+  expensesCreated      Expense[]      @relation("ExpenseCreatedBy")
+  expensePayments      ExpensePayer[] @relation("ExpensePayerUser")
+  expenseShares        ExpenseSplit[] @relation("ExpenseSplitUser")
+  ledgerEntries        LedgerEntry[]  @relation("LedgerEntryUser")
+  ledgerCounterparty   LedgerEntry[]  @relation("LedgerEntryCounterparty")
+  activities           Activity[]     @relation("ActivityActor")
 }
 
 model RefreshToken {
@@ -50,8 +56,11 @@ model Group {
   createdAt    DateTime  @default(now())
   archivedAt   DateTime?
 
-  members GroupMember[]
-  invites GroupInvite[]
+  members       GroupMember[]
+  invites       GroupInvite[]
+  expenses      Expense[]
+  ledgerEntries LedgerEntry[]
+  activities    Activity[]
 }
 
 model GroupMember {
@@ -79,4 +88,98 @@ model GroupInvite {
   createdAt   DateTime  @default(now())
 
   @@index([groupId])
+}
+
+enum SplitType {
+  EQUAL
+  EXACT
+  PERCENT
+  SHARES
+}
+
+model Expense {
+  id              String    @id @db.Uuid
+  groupId         String    @db.Uuid
+  group           Group     @relation(fields: [groupId], references: [id])
+  description     String
+  category        String?
+  currency        String    @db.Char(3)
+  amountMinor     BigInt
+  fxRateToBase    Decimal   @db.Decimal(18, 8)
+  amountBaseMinor BigInt
+  splitType       SplitType
+  paidAt          DateTime
+  createdById     String    @db.Uuid
+  createdBy       User      @relation("ExpenseCreatedBy", fields: [createdById], references: [id])
+  version         Int       @default(1)
+  deletedAt       DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  payers ExpensePayer[]
+  splits ExpenseSplit[]
+
+  @@index([groupId, createdAt])
+}
+
+model ExpensePayer {
+  expenseId       String  @db.Uuid
+  expense         Expense @relation(fields: [expenseId], references: [id])
+  userId          String  @db.Uuid
+  user            User    @relation("ExpensePayerUser", fields: [userId], references: [id])
+  amountMinor     BigInt
+  amountBaseMinor BigInt
+
+  @@id([expenseId, userId])
+}
+
+model ExpenseSplit {
+  expenseId       String   @db.Uuid
+  expense         Expense  @relation(fields: [expenseId], references: [id])
+  userId          String   @db.Uuid
+  user            User     @relation("ExpenseSplitUser", fields: [userId], references: [id])
+  shareInput      Decimal? @db.Decimal(18, 8)
+  amountMinor     BigInt
+  amountBaseMinor BigInt
+
+  @@id([expenseId, userId])
+}
+
+enum LedgerSourceType {
+  EXPENSE
+  EXPENSE_REVERSAL
+  SETTLEMENT
+  SETTLEMENT_REVERSAL
+}
+
+model LedgerEntry {
+  id              String           @id @db.Uuid
+  groupId         String           @db.Uuid
+  group           Group            @relation(fields: [groupId], references: [id])
+  userId          String           @db.Uuid
+  user            User             @relation("LedgerEntryUser", fields: [userId], references: [id])
+  counterpartyId  String?          @db.Uuid
+  counterparty    User?            @relation("LedgerEntryCounterparty", fields: [counterpartyId], references: [id])
+  amountBaseMinor BigInt
+  sourceType      LedgerSourceType
+  sourceId        String           @db.Uuid
+  createdAt       DateTime         @default(now())
+
+  @@index([groupId, userId])
+  @@index([sourceId])
+}
+
+model Activity {
+  id         String   @id @db.Uuid
+  groupId    String   @db.Uuid
+  group      Group    @relation(fields: [groupId], references: [id])
+  actorId    String   @db.Uuid
+  actor      User     @relation("ActivityActor", fields: [actorId], references: [id])
+  type       String
+  entityType String
+  entityId   String   @db.Uuid
+  payload    Json
+  createdAt  DateTime @default(now())
+
+  @@index([groupId, createdAt])
 }

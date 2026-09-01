@@ -2,6 +2,12 @@ import type { NextFunction, Request, Response } from "express";
 import type { ZodSchema } from "zod";
 import { ApiError } from "./errorHandler.js";
 
+declare module "express-serve-static-core" {
+  interface Request {
+    validatedQuery: unknown;
+  }
+}
+
 export function validateBody<T>(schema: ZodSchema<T>) {
   return (req: Request, _res: Response, next: NextFunction) => {
     const result = schema.safeParse(req.body);
@@ -14,6 +20,22 @@ export function validateBody<T>(schema: ZodSchema<T>) {
       return;
     }
     req.body = result.data;
+    next();
+  };
+}
+
+export function validateQuery<T>(schema: ZodSchema<T>) {
+  return (req: Request, _res: Response, next: NextFunction) => {
+    const result = schema.safeParse(req.query);
+    if (!result.success) {
+      next(
+        new ApiError(422, "VALIDATION_ERROR", "Query parameters failed validation.", {
+          issues: result.error.issues,
+        }),
+      );
+      return;
+    }
+    req.validatedQuery = result.data;
     next();
   };
 }

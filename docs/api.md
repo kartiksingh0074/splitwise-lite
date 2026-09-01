@@ -146,11 +146,71 @@ wires up the real ledger.
 Errors: `404 NOT_FOUND`, `403 FORBIDDEN`, `409 LAST_OWNER`, `409 MEMBER_HAS_BALANCE` (not
 reachable yet).
 
+### `GET /groups/:id/expenses`
+
+Requires membership (any role). Cursor-paginated, newest `paidAt` first.
+
+**Query** `?cursor&limit&paidBy&from&to`
+
+**Response `200`** `{ expenses: [Expense], nextCursor: string | null }`
+
+### `POST /groups/:id/expenses`
+
+Requires membership (any role). All currency amounts are decimal strings (e.g. `"20.00"`),
+never JSON numbers — money is never a float, per project.md rule #1.
+
+`splits` and `payers` both reuse the same split engine (project.md §4.1): `splits[].input` is a
+minor-unit integer string for `EXACT`, a percentage for `PERCENT`, an integer weight for `SHARES`
+(omitted for `EQUAL`). For `payers`, either every entry omits `amount` (split the total equally
+among them) or every entry provides one (a decimal string, validated to sum exactly to `amount`)
+— mixing the two is a validation error.
+
+**Body** `{ description, category?, currency, amount, splitType, splits: [{userId, input?}], payers: [{userId, amount?}], paidAt }`
+
+**Response `201`** an `Expense` — `{ id, groupId, description, category, currency, amount, baseCurrency, amountBase, fxRateToBase, splitType, paidAt, createdById, version, createdAt, updatedAt, payers: [{userId, name, amount, amountBase}], splits: [{userId, name, amount, amountBase, input}] }`
+
+Errors: `422 SPLIT_MISMATCH` (splits/payers don't sum to `amount`), `422 UNSUPPORTED_CURRENCY` (no
+static FX rate for this currency), `422 INVALID_PARTICIPANT` (a listed userId isn't an active
+group member), `422 VALIDATION_ERROR`.
+
+### `GET /expenses/:id`
+
+Requires membership in the expense's group.
+
+**Response `200`** an `Expense` (see above).
+
+Errors: `404 NOT_FOUND` (non-members, or the expense is soft-deleted).
+
+### `PATCH /expenses/:id`
+
+Requires the expense's creator or the group's `OWNER`. Full replace (same body as `POST`), not a
+partial patch — old `ExpensePayer`/`ExpenseSplit` rows are replaced and old `LedgerEntry` rows are
+reversed (never mutated) before fresh ones are written; `version` increments by 1.
+
+**Header** `If-Match: <current version>` — required.
+
+**Body** same as `POST /groups/:id/expenses`.
+
+**Response `200`** the updated `Expense`.
+
+Errors: `400 IF_MATCH_REQUIRED` (header missing/non-integer), `409 STALE_VERSION` (header doesn't
+match the current version), `403 FORBIDDEN`, `404 NOT_FOUND`, `422 SPLIT_MISMATCH`,
+`422 UNSUPPORTED_CURRENCY`, `422 INVALID_PARTICIPANT`, `422 VALIDATION_ERROR`.
+
+### `DELETE /expenses/:id`
+
+Requires the expense's creator or the group's `OWNER`. Soft delete (`deletedAt`) + `LedgerEntry`
+reversal only — no fresh entries.
+
+**Response `204`** (no body)
+
+Errors: `403 FORBIDDEN`, `404 NOT_FOUND`.
+
 ## Error codes reference
 
 | Code | Status | Where |
 |---|---|---|
-| `NOT_FOUND` | 404 | any unmatched route, or a group you're not a member of |
+| `NOT_FOUND` | 404 | any unmatched route, a group you're not a member of, or an expense you can't see |
 | `BAD_REQUEST` | 400 | malformed path parameter |
 | `VALIDATION_ERROR` | 422 | request body fails Zod validation |
 | `EMAIL_TAKEN` | 409 | register with an existing email |
@@ -161,4 +221,9 @@ reachable yet).
 | `INVITE_INVALID` | 404 | invite code is unknown, expired, or already used |
 | `LAST_OWNER` | 409 | tried to remove a group's only remaining owner |
 | `MEMBER_HAS_BALANCE` | 409 | tried to remove a member with a non-zero balance (stubbed until Phase 4) |
+| `SPLIT_MISMATCH` | 422 | expense splits/payers don't sum exactly to the total |
+| `UNSUPPORTED_CURRENCY` | 422 | no static FX rate available for the expense/group currency pair |
+| `INVALID_PARTICIPANT` | 422 | a split/payer userId isn't an active member of the group |
+| `IF_MATCH_REQUIRED` | 400 | `PATCH /expenses/:id` without a valid `If-Match` header |
+| `STALE_VERSION` | 409 | `If-Match` doesn't match the expense's current version |
 | `INTERNAL_ERROR` | 500 | unhandled error |

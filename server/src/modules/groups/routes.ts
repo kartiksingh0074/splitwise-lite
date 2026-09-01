@@ -5,6 +5,7 @@ import { validateBody } from "../../middleware/validate.js";
 import { getParam } from "../../lib/params.js";
 import { createGroupSchema, updateGroupSchema } from "./schemas.js";
 import * as groupsService from "./service.js";
+import { groupExpensesRouter } from "../expenses/routes.js";
 
 export const groupsRouter = Router();
 
@@ -72,3 +73,5 @@ groupsRouter.delete(
     }
   },
 );
+
+groupsRouter.use("/:id/expenses", requireGroupRole("MEMBER"), groupExpensesRouter);

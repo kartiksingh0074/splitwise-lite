@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import {
   createInvite,
   getGroup,
@@ -7,6 +7,7 @@ import {
   updateGroup,
   type GroupDetail,
 } from "../features/groups/api.ts";
+import { deleteExpense, listExpenses, type Expense } from "../features/expenses/api.ts";
 import { ApiError } from "../lib/api.ts";
 import { useAuthStore } from "../stores/authStore.ts";
 
@@ -23,6 +24,14 @@ export function GroupDetailPage() {
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [expenses, setExpenses] = useState<Expense[] | null>(null);
+
+  const loadExpenses = () => {
+    if (!id) return;
+    listExpenses(id)
+      .then((res) => setExpenses(res.expenses))
+      .catch(() => setError("Couldn't load expenses."));
+  };
 
   const load = () => {
     if (!id) return;
@@ -36,7 +45,20 @@ export function GroupDetailPage() {
 
   useEffect(load, [id]);
 
+  useEffect(() => {
+    if (tab === "Expenses") loadExpenses();
+  }, [tab, id]);
+
   const isOwner = group?.members.some((m) => m.userId === userId && m.role === "OWNER") ?? false;
+
+  const handleDeleteExpense = async (expenseId: string) => {
+    try {
+      await deleteExpense(expenseId);
+      loadExpenses();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't delete that expense.");
+    }
+  };
 
   const handleRename = async () => {
     if (!id) return;
@@ -169,7 +191,57 @@ export function GroupDetailPage() {
       )}
 
       {tab === "Expenses" && (
-        <p className="text-sm text-slate-500">Coming in Phase 3.</p>
+        <div className="flex flex-col gap-4">
+          <Link
+            to={`/groups/${id}/expenses/new`}
+            className="self-start rounded bg-slate-900 px-3 py-1.5 text-sm text-white"
+          >
+            Add expense
+          </Link>
+
+          {expenses && expenses.length === 0 && (
+            <p className="text-sm text-slate-600">No expenses yet.</p>
+          )}
+
+          <ul className="flex flex-col gap-2">
+            {expenses?.map((expense) => {
+              const canEdit = isOwner || expense.createdById === userId;
+              return (
+                <li
+                  key={expense.id}
+                  className="flex items-center justify-between rounded border border-slate-200 bg-white px-4 py-3"
+                >
+                  <div>
+                    <p className="font-medium text-slate-900">{expense.description}</p>
+                    <p className="text-xs text-slate-500">
+                      {expense.currency} {expense.amount}
+                      {expense.currency !== expense.baseCurrency &&
+                        ` (${expense.baseCurrency} ${expense.amountBase})`}
+                      {" · "}
+                      {new Date(expense.paidAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  {canEdit && (
+                    <div className="flex items-center gap-3 text-sm">
+                      <Link
+                        to={`/groups/${id}/expenses/${expense.id}/edit`}
+                        className="text-slate-600 underline"
+                      >
+                        Edit
+                      </Link>
+                      <button
+                        onClick={() => handleDeleteExpense(expense.id)}
+                        className="text-red-600 underline"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
       {tab === "Balances" && (
         <p className="text-sm text-slate-500">Coming in Phase 4.</p>

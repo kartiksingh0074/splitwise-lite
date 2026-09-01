@@ -3,6 +3,7 @@ import { Route, Routes } from "react-router-dom";
 import { AppLayout } from "../components/AppLayout.tsx";
 import { ProtectedRoute } from "../components/ProtectedRoute.tsx";
 import { CreateGroupPage } from "./CreateGroupPage.tsx";
+import { ExpenseFormPage } from "./ExpenseFormPage.tsx";
 import { GroupDetailPage } from "./GroupDetailPage.tsx";
 import { GroupsListPage } from "./GroupsListPage.tsx";
 import { HomePage } from "./HomePage.tsx";
@@ -51,6 +52,22 @@ export function AppRoutes() {
         element={
           <Authenticated>
             <GroupDetailPage />
+          </Authenticated>
+        }
+      />
+      <Route
+        path="/groups/:id/expenses/new"
+        element={
+          <Authenticated>
+            <ExpenseFormPage />
+          </Authenticated>
+        }
+      />
+      <Route
+        path="/groups/:id/expenses/:expenseId/edit"
+        element={
+          <Authenticated>
+            <ExpenseFormPage />
           </Authenticated>
         }
       />
