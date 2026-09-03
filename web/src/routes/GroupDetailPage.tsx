@@ -8,8 +8,10 @@ import {
   type GroupDetail,
 } from "../features/groups/api.ts";
 import { deleteExpense, listExpenses, type Expense } from "../features/expenses/api.ts";
+import { getBalances, getSettlePlan } from "../features/balances/api.ts";
 import { ApiError } from "../lib/api.ts";
 import { useAuthStore } from "../stores/authStore.ts";
+import { selectDisplayedTransfers, useBalancesStore } from "../stores/balancesStore.ts";
 
 const TABS = ["Members", "Expenses", "Balances", "Activity"] as const;
 type Tab = (typeof TABS)[number];
@@ -25,12 +27,25 @@ export function GroupDetailPage() {
   const [nameDraft, setNameDraft] = useState("");
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [expenses, setExpenses] = useState<Expense[] | null>(null);
+  const balancesData = useBalancesStore((state) => state.balances);
+  const settlePlan = useBalancesStore((state) => state.settlePlan);
+  const view = useBalancesStore((state) => state.view);
+  const setBalancesData = useBalancesStore((state) => state.setData);
+  const setView = useBalancesStore((state) => state.setView);
+  const displayedTransfers = useBalancesStore(selectDisplayedTransfers);
 
   const loadExpenses = () => {
     if (!id) return;
     listExpenses(id)
       .then((res) => setExpenses(res.expenses))
       .catch(() => setError("Couldn't load expenses."));
+  };
+
+  const loadBalances = () => {
+    if (!id) return;
+    Promise.all([getBalances(id), getSettlePlan(id, "greedy")])
+      .then(([balances, plan]) => setBalancesData(balances, plan))
+      .catch(() => setError("Couldn't load balances."));
   };
 
   const load = () => {
@@ -47,6 +62,7 @@ export function GroupDetailPage() {
 
   useEffect(() => {
     if (tab === "Expenses") loadExpenses();
+    if (tab === "Balances") loadBalances();
   }, [tab, id]);
 
   const isOwner = group?.members.some((m) => m.userId === userId && m.role === "OWNER") ?? false;
@@ -244,7 +260,94 @@ export function GroupDetailPage() {
         </div>
       )}
       {tab === "Balances" && (
-        <p className="text-sm text-slate-500">Coming in Phase 4.</p>
+        <div className="flex flex-col gap-6">
+          <div>
+            <h2 className="mb-2 text-sm font-semibold text-slate-900">Net balances</h2>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+              {balancesData?.net.map((b) => {
+                const amount = Number(b.amount);
+                const positive = amount > 0;
+                const negative = amount < 0;
+                return (
+                  <div
+                    key={b.userId}
+                    className={`rounded border px-3 py-2 ${
+                      positive
+                        ? "border-green-200 bg-green-50"
+                        : negative
+                          ? "border-red-200 bg-red-50"
+                          : "border-slate-200 bg-white"
+                    }`}
+                  >
+                    <p className="text-sm font-medium text-slate-900">{b.name}</p>
+                    <p
+                      className={`text-sm ${
+                        positive ? "text-green-700" : negative ? "text-red-700" : "text-slate-500"
+                      }`}
+                    >
+                      {positive && "+"}
+                      {group.baseCurrency} {b.amount}
+                      {positive && " owed"}
+                      {negative && " owes"}
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-slate-900">
+                Settle plan
+                {settlePlan && (
+                  <span className="ml-2 font-normal text-slate-500">
+                    {settlePlan.naiveCount} transactions → {settlePlan.transferCount}
+                  </span>
+                )}
+              </h2>
+              <div className="flex gap-2 text-sm">
+                <button
+                  onClick={() => setView("simplified")}
+                  className={`rounded px-2 py-1 ${
+                    view === "simplified" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700"
+                  }`}
+                >
+                  Simplified
+                </button>
+                <button
+                  onClick={() => setView("direct")}
+                  className={`rounded px-2 py-1 ${
+                    view === "direct" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700"
+                  }`}
+                >
+                  Direct
+                </button>
+              </div>
+            </div>
+
+            {displayedTransfers.length === 0 && (
+              <p className="text-sm text-slate-600">Nobody owes anybody anything.</p>
+            )}
+
+            <ul className="flex flex-col gap-2">
+              {displayedTransfers.map((t, i) => (
+                <li
+                  key={`${t.from}-${t.to}-${i}`}
+                  className="rounded border border-slate-200 bg-white px-4 py-3 text-sm"
+                >
+                  <span className="font-medium text-slate-900">{t.fromName}</span>
+                  <span className="text-slate-500"> owes </span>
+                  <span className="font-medium text-slate-900">{t.toName}</span>
+                  <span className="text-slate-500"> </span>
+                  <span className="font-medium text-slate-900">
+                    {group.baseCurrency} {t.amount}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
       )}
       {tab === "Activity" && (
         <p className="text-sm text-slate-500">Coming in Phase 6.</p>

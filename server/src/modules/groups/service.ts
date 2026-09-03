@@ -4,6 +4,7 @@ import type { z } from "zod";
 import { prisma } from "../../db/client.js";
 import { uuidv7 } from "../../lib/id.js";
 import { ApiError } from "../../middleware/errorHandler.js";
+import { getUserNetBalance } from "../balances/service.js";
 import type { createGroupSchema, updateGroupSchema } from "./schemas.js";
 
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
@@ -169,7 +170,7 @@ export async function removeMember(groupId: string, targetUserId: string) {
       }
     }
 
-    const balance = await getMemberBalance(groupId, targetUserId);
+    const balance = await getUserNetBalance(groupId, targetUserId);
     if (balance !== 0n) {
       throw new ApiError(
         409,
@@ -183,10 +184,4 @@ export async function removeMember(groupId: string, targetUserId: string) {
       data: { leftAt: new Date() },
     });
   });
-}
-
-// Ledger doesn't exist until Phase 3 — always zero until then, at which point this
-// reads real LedgerEntry rows without needing to change removeMember's call site.
-export function getMemberBalance(_groupId: string, _userId: string): Promise<bigint> {
-  return Promise.resolve(0n);
 }

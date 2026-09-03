@@ -137,14 +137,12 @@ Errors: `404 INVITE_INVALID`.
 
 ### `DELETE /groups/:id/members/:userId`
 
-Requires `OWNER`. Blocked if the target is the group's sole remaining `OWNER`, or (from Phase 4
-onward) has a non-zero balance in the group — that check is stubbed to always pass until Phase 4
-wires up the real ledger.
+Requires `OWNER`. Blocked if the target is the group's sole remaining `OWNER`, or has a non-zero
+net balance in the group (checked against real `LedgerEntry` data as of Phase 4).
 
 **Response `204`** (no body)
 
-Errors: `404 NOT_FOUND`, `403 FORBIDDEN`, `409 LAST_OWNER`, `409 MEMBER_HAS_BALANCE` (not
-reachable yet).
+Errors: `404 NOT_FOUND`, `403 FORBIDDEN`, `409 LAST_OWNER`, `409 MEMBER_HAS_BALANCE`.
 
 ### `GET /groups/:id/expenses`
 
@@ -206,6 +204,29 @@ reversal only — no fresh entries.
 
 Errors: `403 FORBIDDEN`, `404 NOT_FOUND`.
 
+### `GET /groups/:id/balances`
+
+Requires membership (any role). `net` covers every active group member (defaulting to `"0.00"`
+for anyone with no ledger activity yet), computed from `LedgerEntry` — the source of truth.
+`pairwise` is a *derived, informational* "who owes whom directly" view, computed on read from
+current non-deleted expenses (a participant's share is distributed across that expense's payers
+proportional to their contribution, then netted per pair) — not ledger-authoritative, and nothing
+extra is stored for it.
+
+**Response `200`** `{ net: [{userId, name, amount}], pairwise: [{from, fromName, to, toName, amount}] }`
+
+### `GET /groups/:id/settle-plan`
+
+Requires membership (any role). Runs project.md §4.3's greedy max-creditor/max-debtor matching
+over the group's net balances (≤ n−1 transfers, a heuristic — true minimum-transfer is NP-hard),
+or the `subset` refinement for small groups (partitions into independent zero-sum subsets first;
+never produces more transfers than `greedy`). `naiveCount` is the pairwise view's transfer count,
+for the "N transactions → M" comparison.
+
+**Query** `?strategy=greedy|subset` (default `greedy`)
+
+**Response `200`** `{ strategy, transfers: [{from, fromName, to, toName, amount}], transferCount, naiveCount }`
+
 ## Error codes reference
 
 | Code | Status | Where |
@@ -220,7 +241,7 @@ Errors: `403 FORBIDDEN`, `404 NOT_FOUND`.
 | `FORBIDDEN` | 403 | a group member's role is too low for the action |
 | `INVITE_INVALID` | 404 | invite code is unknown, expired, or already used |
 | `LAST_OWNER` | 409 | tried to remove a group's only remaining owner |
-| `MEMBER_HAS_BALANCE` | 409 | tried to remove a member with a non-zero balance (stubbed until Phase 4) |
+| `MEMBER_HAS_BALANCE` | 409 | tried to remove a member with a non-zero balance |
 | `SPLIT_MISMATCH` | 422 | expense splits/payers don't sum exactly to the total |
 | `UNSUPPORTED_CURRENCY` | 422 | no static FX rate available for the expense/group currency pair |
 | `INVALID_PARTICIPANT` | 422 | a split/payer userId isn't an active member of the group |
