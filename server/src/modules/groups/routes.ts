@@ -8,6 +8,7 @@ import * as groupsService from "./service.js";
 import { groupExpensesRouter } from "../expenses/routes.js";
 import { balancesRouter } from "../balances/routes.js";
 import { groupSettlementsRouter } from "../settlements/routes.js";
+import { activityRouter } from "../activity/routes.js";
 
 export const groupsRouter = Router();
 
@@ -68,7 +69,7 @@ groupsRouter.delete(
   requireGroupRole("OWNER"),
   async (req, res, next) => {
     try {
-      await groupsService.removeMember(getParam(req, "id"), getParam(req, "userId"));
+      await groupsService.removeMember(getParam(req, "id"), getParam(req, "userId"), req.user.id);
       res.status(204).end();
     } catch (err) {
       next(err);
@@ -78,4 +79,5 @@ groupsRouter.delete(
 
 groupsRouter.use("/:id/expenses", requireGroupRole("MEMBER"), groupExpensesRouter);
 groupsRouter.use("/:id/settlements", requireGroupRole("MEMBER"), groupSettlementsRouter);
+groupsRouter.use("/:id/activity", requireGroupRole("MEMBER"), activityRouter);
 groupsRouter.use("/:id", requireGroupRole("MEMBER"), balancesRouter);

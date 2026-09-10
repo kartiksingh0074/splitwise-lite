@@ -3,6 +3,7 @@ import type { Group } from "@prisma/client";
 import type { z } from "zod";
 import { prisma } from "../../db/client.js";
 import { uuidv7 } from "../../lib/id.js";
+import { recordActivity } from "../../lib/activity.js";
 import { ApiError } from "../../middleware/errorHandler.js";
 import { getUserNetBalance } from "../balances/service.js";
 import type { createGroupSchema, updateGroupSchema } from "./schemas.js";
@@ -40,6 +41,15 @@ export async function createGroup(creatorId: string, input: z.infer<typeof creat
       data: { groupId, userId: creatorId, role: "OWNER" },
     });
 
+    await recordActivity(tx, {
+      groupId,
+      actorId: creatorId,
+      type: "GROUP_CREATED",
+      entityType: "Group",
+      entityId: groupId,
+      payload: { name: input.name, baseCurrency: input.baseCurrency },
+    });
+
     const pendingInvites: { email: string; code: string; expiresAt: Date }[] = [];
 
     for (const email of new Set(input.memberEmails)) {
@@ -48,6 +58,14 @@ export async function createGroup(creatorId: string, input: z.infer<typeof creat
       if (user && user.id !== creatorId) {
         await tx.groupMember.create({
           data: { groupId, userId: user.id, role: "MEMBER" },
+        });
+        await recordActivity(tx, {
+          groupId,
+          actorId: creatorId,
+          type: "MEMBER_JOINED",
+          entityType: "GroupMember",
+          entityId: user.id,
+          payload: { userId: user.id, name: user.name },
         });
       } else if (!user) {
         const code = generateInviteCode();
@@ -132,17 +150,29 @@ export async function acceptInvite(code: string, userId: string) {
       where: { groupId_userId: { groupId: invite.groupId, userId } },
     });
 
-    if (!existing) {
-      await tx.groupMember.create({
-        data: { groupId: invite.groupId, userId, role: "MEMBER" },
-      });
-    } else if (existing.leftAt) {
-      await tx.groupMember.update({
-        where: { groupId_userId: { groupId: invite.groupId, userId } },
-        data: { leftAt: null, role: "MEMBER", joinedAt: new Date() },
+    if (!existing || existing.leftAt) {
+      if (!existing) {
+        await tx.groupMember.create({
+          data: { groupId: invite.groupId, userId, role: "MEMBER" },
+        });
+      } else {
+        await tx.groupMember.update({
+          where: { groupId_userId: { groupId: invite.groupId, userId } },
+          data: { leftAt: null, role: "MEMBER", joinedAt: new Date() },
+        });
+      }
+
+      const joiningUser = await tx.user.findUniqueOrThrow({ where: { id: userId } });
+      await recordActivity(tx, {
+        groupId: invite.groupId,
+        actorId: userId,
+        type: "MEMBER_JOINED",
+        entityType: "GroupMember",
+        entityId: userId,
+        payload: { userId, name: joiningUser.name },
       });
     }
-    // else: already an active member — the invite is still consumed below.
+    // else: already an active member — the invite is still consumed below, no new activity.
 
     await tx.groupInvite.update({ where: { id: invite.id }, data: { usedById: userId } });
 
@@ -151,7 +181,7 @@ export async function acceptInvite(code: string, userId: string) {
   });
 }
 
-export async function removeMember(groupId: string, targetUserId: string) {
+export async function removeMember(groupId: string, targetUserId: string, actorId: string) {
   await prisma.$transaction(async (tx) => {
     const target = await tx.groupMember.findUnique({
       where: { groupId_userId: { groupId, userId: targetUserId } },
@@ -182,6 +212,16 @@ export async function removeMember(groupId: string, targetUserId: string) {
     await tx.groupMember.update({
       where: { groupId_userId: { groupId, userId: targetUserId } },
       data: { leftAt: new Date() },
+    });
+
+    const removedUser = await tx.user.findUniqueOrThrow({ where: { id: targetUserId } });
+    await recordActivity(tx, {
+      groupId,
+      actorId,
+      type: "MEMBER_REMOVED",
+      entityType: "GroupMember",
+      entityId: targetUserId,
+      payload: { userId: targetUserId, name: removedUser.name },
     });
   });
 }

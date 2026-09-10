@@ -375,6 +375,43 @@ export async function listExpenses(groupId: string, query: ListQuery) {
   return { expenses: page.map(toPublicExpense), nextCursor };
 }
 
+type ExpenseFieldChange = { before: string | null; after: string | null };
+
+/** Before/after diff of Expense's own scalar fields (not the payer/split composition). */
+function buildExpenseDiff(
+  before: { description: string; category: string | null; currency: string; amountMinor: bigint; splitType: string; paidAt: Date },
+  input: ExpenseInput,
+): Record<string, ExpenseFieldChange> {
+  const changes: Record<string, ExpenseFieldChange> = {};
+
+  const beforeAmount = formatMinor(before.amountMinor, before.currency);
+  const beforePaidAt = before.paidAt.toISOString();
+  const afterPaidAt = new Date(input.paidAt).toISOString();
+  const beforeCategory = before.category ?? null;
+  const afterCategory = input.category ?? null;
+
+  if (before.description !== input.description) {
+    changes.description = { before: before.description, after: input.description };
+  }
+  if (beforeCategory !== afterCategory) {
+    changes.category = { before: beforeCategory, after: afterCategory };
+  }
+  if (before.currency !== input.currency) {
+    changes.currency = { before: before.currency, after: input.currency };
+  }
+  if (beforeAmount !== input.amount) {
+    changes.amount = { before: beforeAmount, after: input.amount };
+  }
+  if (before.splitType !== input.splitType) {
+    changes.splitType = { before: before.splitType, after: input.splitType };
+  }
+  if (beforePaidAt !== afterPaidAt) {
+    changes.paidAt = { before: beforePaidAt, after: afterPaidAt };
+  }
+
+  return changes;
+}
+
 export async function getExpense(expenseId: string, userId: string) {
   await loadExpenseWithMembership(expenseId, userId);
   const expense = await prisma.expense.findUniqueOrThrow({
@@ -407,6 +444,7 @@ export async function updateExpense(
   await assertActiveMembers(expense.groupId, participantIds);
 
   const prepared = prepareExpenseWrite(group.baseCurrency, expenseId, input);
+  const changes = buildExpenseDiff(expense, input);
 
   await prisma.$transaction(async (tx) => {
     await reverseExistingLedger(tx, expenseId, expense.groupId);
@@ -461,7 +499,7 @@ export async function updateExpense(
       type: "EXPENSE_EDITED",
       entityType: "Expense",
       entityId: expenseId,
-      payload: { description: input.description, amount: input.amount, currency: input.currency },
+      payload: { changes },
     });
   });
 

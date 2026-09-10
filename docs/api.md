@@ -293,6 +293,21 @@ membership check on every read; there is no static-file path serving uploads dir
 
 Errors: `404 NOT_FOUND`, `404 RECEIPT_NOT_FOUND` (no receipt uploaded, or the file is missing).
 
+### `GET /groups/:id/activity`
+
+Requires membership (any role). Cursor-paginated, newest first. Every activity type
+(`GROUP_CREATED`, `MEMBER_JOINED`, `MEMBER_REMOVED`, `EXPENSE_ADDED`, `EXPENSE_EDITED`,
+`EXPENSE_DELETED`, `SETTLEMENT_RECORDED`, `SETTLEMENT_CONFIRMED`, `SETTLEMENT_REJECTED`) renders
+purely from its stored `payload` — never re-joined against the live `Expense`/`Settlement`/etc.
+row, so a row stays fully readable after the entity it refers to is deleted.
+`EXPENSE_EDITED`'s payload is `{ changes: { [field]: { before, after } } }`, listing only the
+`Expense` scalar fields (`description`/`category`/`currency`/`amount`/`splitType`/`paidAt`) that
+actually changed.
+
+**Query** `?cursor&limit`
+
+**Response `200`** `{ activities: [{ id, type, entityType, entityId, actorId, actorName, payload, createdAt }], nextCursor: string | null }`
+
 ## Error codes reference
 
 | Code | Status | Where |

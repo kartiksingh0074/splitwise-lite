@@ -15,6 +15,8 @@ import {
   rejectSettlement,
   type Settlement,
 } from "../features/settlements/api.ts";
+import { listActivity, type ActivityEntry } from "../features/activity/api.ts";
+import { activityLink, formatActivityLabel, formatDayHeading, groupByDay } from "../features/activity/format.ts";
 import { ApiError } from "../lib/api.ts";
 import { useAuthStore } from "../stores/authStore.ts";
 import { selectDisplayedTransfers, useBalancesStore } from "../stores/balancesStore.ts";
@@ -41,6 +43,33 @@ export function GroupDetailPage() {
   const setView = useBalancesStore((state) => state.setView);
   const displayedTransfers = useBalancesStore(selectDisplayedTransfers);
   const [settlements, setSettlements] = useState<Settlement[] | null>(null);
+  const [activities, setActivities] = useState<ActivityEntry[] | null>(null);
+  const [activityCursor, setActivityCursor] = useState<string | null>(null);
+  const [activityLoadingMore, setActivityLoadingMore] = useState(false);
+
+  const loadActivity = () => {
+    if (!id) return;
+    listActivity(id)
+      .then((res) => {
+        setActivities(res.activities);
+        setActivityCursor(res.nextCursor);
+      })
+      .catch(() => setError("Couldn't load activity."));
+  };
+
+  const loadMoreActivity = async () => {
+    if (!id || !activityCursor) return;
+    setActivityLoadingMore(true);
+    try {
+      const res = await listActivity(id, activityCursor);
+      setActivities((prev) => [...(prev ?? []), ...res.activities]);
+      setActivityCursor(res.nextCursor);
+    } catch {
+      setError("Couldn't load more activity.");
+    } finally {
+      setActivityLoadingMore(false);
+    }
+  };
 
   const loadSettlements = () => {
     if (!id) return;
@@ -79,6 +108,7 @@ export function GroupDetailPage() {
   useEffect(() => {
     if (tab === "Expenses") loadExpenses();
     if (tab === "Balances") loadBalances();
+    if (tab === "Activity") loadActivity();
   }, [tab, id]);
 
   const isOwner = group?.members.some((m) => m.userId === userId && m.role === "OWNER") ?? false;
@@ -453,7 +483,60 @@ export function GroupDetailPage() {
         </div>
       )}
       {tab === "Activity" && (
-        <p className="text-sm text-slate-500">Coming in Phase 6.</p>
+        <div className="flex flex-col gap-6">
+          {activities && activities.length === 0 && (
+            <p className="text-sm text-slate-600">No activity yet.</p>
+          )}
+
+          {activities &&
+            groupByDay(activities).map(([day, entries]) => (
+              <div key={day}>
+                <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  {formatDayHeading(entries[0]!.createdAt)}
+                </h2>
+                <ul className="flex flex-col gap-2">
+                  {entries.map((a) => {
+                    const link = activityLink(id ?? "", a);
+                    const content = (
+                      <>
+                        <p className="text-sm text-slate-900">{formatActivityLabel(a)}</p>
+                        <p className="text-xs text-slate-500">
+                          {new Date(a.createdAt).toLocaleTimeString(undefined, {
+                            hour: "numeric",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </>
+                    );
+                    return (
+                      <li
+                        key={a.id}
+                        className="rounded border border-slate-200 bg-white px-4 py-3"
+                      >
+                        {link ? (
+                          <Link to={link} className="block hover:underline">
+                            {content}
+                          </Link>
+                        ) : (
+                          content
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ))}
+
+          {activityCursor && (
+            <button
+              onClick={loadMoreActivity}
+              disabled={activityLoadingMore}
+              className="self-center rounded bg-slate-100 px-4 py-1.5 text-sm text-slate-700 disabled:opacity-50"
+            >
+              {activityLoadingMore ? "Loading…" : "Load more"}
+            </button>
+          )}
+        </div>
       )}
     </div>
   );
