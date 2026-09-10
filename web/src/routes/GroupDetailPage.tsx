@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   createInvite,
   getGroup,
@@ -9,6 +9,12 @@ import {
 } from "../features/groups/api.ts";
 import { deleteExpense, listExpenses, type Expense } from "../features/expenses/api.ts";
 import { getBalances, getSettlePlan } from "../features/balances/api.ts";
+import {
+  confirmSettlement,
+  listSettlements,
+  rejectSettlement,
+  type Settlement,
+} from "../features/settlements/api.ts";
 import { ApiError } from "../lib/api.ts";
 import { useAuthStore } from "../stores/authStore.ts";
 import { selectDisplayedTransfers, useBalancesStore } from "../stores/balancesStore.ts";
@@ -18,6 +24,7 @@ type Tab = (typeof TABS)[number];
 
 export function GroupDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const userId = useAuthStore((state) => state.user?.id);
 
   const [group, setGroup] = useState<GroupDetail | null>(null);
@@ -33,6 +40,14 @@ export function GroupDetailPage() {
   const setBalancesData = useBalancesStore((state) => state.setData);
   const setView = useBalancesStore((state) => state.setView);
   const displayedTransfers = useBalancesStore(selectDisplayedTransfers);
+  const [settlements, setSettlements] = useState<Settlement[] | null>(null);
+
+  const loadSettlements = () => {
+    if (!id) return;
+    listSettlements(id)
+      .then((res) => setSettlements(res.settlements))
+      .catch(() => setError("Couldn't load settlements."));
+  };
 
   const loadExpenses = () => {
     if (!id) return;
@@ -46,6 +61,7 @@ export function GroupDetailPage() {
     Promise.all([getBalances(id), getSettlePlan(id, "greedy")])
       .then(([balances, plan]) => setBalancesData(balances, plan))
       .catch(() => setError("Couldn't load balances."));
+    loadSettlements();
   };
 
   const load = () => {
@@ -94,6 +110,25 @@ export function GroupDetailPage() {
       setInviteCode(invite.code);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't create an invite.");
+    }
+  };
+
+  const handleConfirmSettlement = async (settlementId: string) => {
+    try {
+      await confirmSettlement(settlementId);
+      loadSettlements();
+      loadBalances();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't confirm that settlement.");
+    }
+  };
+
+  const handleRejectSettlement = async (settlementId: string) => {
+    try {
+      await rejectSettlement(settlementId);
+      loadSettlements();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't reject that settlement.");
     }
   };
 
@@ -331,22 +366,90 @@ export function GroupDetailPage() {
             )}
 
             <ul className="flex flex-col gap-2">
-              {displayedTransfers.map((t, i) => (
-                <li
-                  key={`${t.from}-${t.to}-${i}`}
-                  className="rounded border border-slate-200 bg-white px-4 py-3 text-sm"
-                >
-                  <span className="font-medium text-slate-900">{t.fromName}</span>
-                  <span className="text-slate-500"> owes </span>
-                  <span className="font-medium text-slate-900">{t.toName}</span>
-                  <span className="text-slate-500"> </span>
-                  <span className="font-medium text-slate-900">
-                    {group.baseCurrency} {t.amount}
-                  </span>
-                </li>
-              ))}
+              {displayedTransfers.map((t, i) => {
+                const pending = settlements?.some(
+                  (s) => s.status === "PENDING" && s.fromUserId === t.from && s.toUserId === t.to,
+                );
+                return (
+                  <li
+                    key={`${t.from}-${t.to}-${i}`}
+                    className="flex items-center justify-between rounded border border-slate-200 bg-white px-4 py-3 text-sm"
+                  >
+                    <div>
+                      <span className="font-medium text-slate-900">{t.fromName}</span>
+                      <span className="text-slate-500"> owes </span>
+                      <span className="font-medium text-slate-900">{t.toName}</span>
+                      <span className="text-slate-500"> </span>
+                      <span className="font-medium text-slate-900">
+                        {group.baseCurrency} {t.amount}
+                      </span>
+                      {pending && (
+                        <span className="ml-2 rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800">
+                          Pending confirmation
+                        </span>
+                      )}
+                    </div>
+                    {t.from === userId && !pending && (
+                      <button
+                        onClick={() =>
+                          navigate(`/groups/${id}/settle-up`, {
+                            state: { toUserId: t.to, toUserName: t.toName, amount: t.amount },
+                          })
+                        }
+                        className="rounded bg-slate-900 px-3 py-1 text-xs text-white"
+                      >
+                        Settle up
+                      </button>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </div>
+
+          {settlements && settlements.filter((s) => s.status === "PENDING").length > 0 && (
+            <div>
+              <h2 className="mb-2 text-sm font-semibold text-slate-900">Pending settlements</h2>
+              <ul className="flex flex-col gap-2">
+                {settlements
+                  .filter((s) => s.status === "PENDING")
+                  .map((s) => (
+                    <li
+                      key={s.id}
+                      className="flex items-center justify-between rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm"
+                    >
+                      <div>
+                        <span className="font-medium text-slate-900">{s.fromUserName}</span>
+                        <span className="text-slate-500"> paid </span>
+                        <span className="font-medium text-slate-900">{s.toUserName}</span>
+                        <span className="text-slate-500"> </span>
+                        <span className="font-medium text-slate-900">
+                          {s.currency} {s.amount}
+                        </span>
+                      </div>
+                      {s.toUserId === userId ? (
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => handleConfirmSettlement(s.id)}
+                            className="text-green-700 underline"
+                          >
+                            Confirm
+                          </button>
+                          <button
+                            onClick={() => handleRejectSettlement(s.id)}
+                            className="text-red-600 underline"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-500">Awaiting confirmation</span>
+                      )}
+                    </li>
+                  ))}
+              </ul>
+            </div>
+          )}
         </div>
       )}
       {tab === "Activity" && (

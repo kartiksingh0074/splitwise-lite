@@ -7,6 +7,7 @@ import { createGroupSchema, updateGroupSchema } from "./schemas.js";
 import * as groupsService from "./service.js";
 import { groupExpensesRouter } from "../expenses/routes.js";
 import { balancesRouter } from "../balances/routes.js";
+import { groupSettlementsRouter } from "../settlements/routes.js";
 
 export const groupsRouter = Router();
 
@@ -76,4 +77,5 @@ groupsRouter.delete(
 );
 
 groupsRouter.use("/:id/expenses", requireGroupRole("MEMBER"), groupExpensesRouter);
+groupsRouter.use("/:id/settlements", requireGroupRole("MEMBER"), groupSettlementsRouter);
 groupsRouter.use("/:id", requireGroupRole("MEMBER"), balancesRouter);

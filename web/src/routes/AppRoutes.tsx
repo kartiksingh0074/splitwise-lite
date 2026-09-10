@@ -9,6 +9,7 @@ import { GroupsListPage } from "./GroupsListPage.tsx";
 import { HomePage } from "./HomePage.tsx";
 import { LoginPage } from "./LoginPage.tsx";
 import { RegisterPage } from "./RegisterPage.tsx";
+import { SettleUpPage } from "./SettleUpPage.tsx";
 
 function Authenticated({ children }: { children: ReactNode }) {
   return (
@@ -68,6 +69,14 @@ export function AppRoutes() {
         element={
           <Authenticated>
             <ExpenseFormPage />
+          </Authenticated>
+        }
+      />
+      <Route
+        path="/groups/:id/settle-up"
+        element={
+          <Authenticated>
+            <SettleUpPage />
           </Authenticated>
         }
       />

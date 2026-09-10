@@ -28,6 +28,9 @@ model User {
   ledgerEntries        LedgerEntry[]  @relation("LedgerEntryUser")
   ledgerCounterparty   LedgerEntry[]  @relation("LedgerEntryCounterparty")
   activities           Activity[]     @relation("ActivityActor")
+  settlementsPaid      Settlement[]   @relation("SettlementFromUser")
+  settlementsReceived  Settlement[]   @relation("SettlementToUser")
+  settlementsCreated   Settlement[]   @relation("SettlementCreatedBy")
 }
 
 model RefreshToken {
@@ -61,6 +64,7 @@ model Group {
   expenses      Expense[]
   ledgerEntries LedgerEntry[]
   activities    Activity[]
+  settlements   Settlement[]
 }
 
 model GroupMember {
@@ -182,4 +186,34 @@ model Activity {
   createdAt  DateTime @default(now())
 
   @@index([groupId, createdAt])
+}
+
+enum SettlementStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
+model Settlement {
+  id              String           @id @db.Uuid
+  groupId         String           @db.Uuid
+  group           Group            @relation(fields: [groupId], references: [id])
+  fromUserId      String           @db.Uuid
+  fromUser        User             @relation("SettlementFromUser", fields: [fromUserId], references: [id])
+  toUserId        String           @db.Uuid
+  toUser          User             @relation("SettlementToUser", fields: [toUserId], references: [id])
+  currency        String           @db.Char(3)
+  amountMinor     BigInt
+  fxRateToBase    Decimal          @db.Decimal(18, 8)
+  amountBaseMinor BigInt
+  note            String?
+  receiptUrl      String?
+  status          SettlementStatus @default(PENDING)
+  settledAt       DateTime
+  createdById     String           @db.Uuid
+  createdBy       User             @relation("SettlementCreatedBy", fields: [createdById], references: [id])
+  idempotencyKey  String           @unique
+  createdAt       DateTime         @default(now())
+
+  @@index([groupId])
 }

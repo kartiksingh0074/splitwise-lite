@@ -57,15 +57,19 @@ async function refreshAccessToken(): Promise<boolean> {
   }
 }
 
-export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
-  const { auth = true, headers, ...rest } = options;
+/** Shared auth + silent-refresh-and-retry plumbing. Returns the raw Response (still may be !ok). */
+async function authenticatedFetch(path: string, options: ApiFetchOptions = {}): Promise<Response> {
+  const { auth = true, headers, body, ...rest } = options;
+  // FormData sets its own multipart Content-Type (with boundary) -- forcing JSON here would break it.
+  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
 
   const doFetch = () => {
     const token = useAuthStore.getState().accessToken;
     return fetch(`${API_BASE_URL}${path}`, {
       ...rest,
+      body,
       headers: {
-        "Content-Type": "application/json",
+        ...(isFormData ? {} : { "Content-Type": "application/json" }),
         ...(auth && token ? { Authorization: `Bearer ${token}` } : {}),
         ...headers,
       },
@@ -84,6 +88,12 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
     }
   }
 
+  return res;
+}
+
+export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): Promise<T> {
+  const res = await authenticatedFetch(path, options);
+
   if (!res.ok) {
     throw await parseError(res);
   }
@@ -93,6 +103,17 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions = {}): 
   }
 
   return res.json();
+}
+
+/** For binary responses (e.g. receipt images) -- returns a Blob instead of parsing JSON. */
+export async function apiFetchBlob(path: string, options: ApiFetchOptions = {}): Promise<Blob> {
+  const res = await authenticatedFetch(path, options);
+
+  if (!res.ok) {
+    throw await parseError(res);
+  }
+
+  return res.blob();
 }
 
 export function getHealth(): Promise<{ status: string }> {

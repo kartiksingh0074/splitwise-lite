@@ -227,6 +227,72 @@ for the "N transactions → M" comparison.
 
 **Response `200`** `{ strategy, transfers: [{from, fromName, to, toName, amount}], transferCount, naiveCount }`
 
+### `GET /groups/:id/settlements`
+
+Requires membership (any role). Not in project.md §6's literal route list, but needed for the
+frontend's pending-confirmation view — the same judgment call Phase 2 made for the analogous gap
+in the invite flow.
+
+**Response `200`** `{ settlements: [Settlement] }`
+
+### `POST /groups/:id/settlements`
+
+Requires membership (any role). `fromUserId` is always the caller — you can only record *yourself*
+as having paid, never on someone else's behalf. `currency` defaults to the group's `baseCurrency`
+if omitted. `PENDING` on creation; does not touch the ledger until confirmed. Retrying the exact
+same `Idempotency-Key` returns the original settlement rather than creating a second one.
+
+**Header** `Idempotency-Key: <client-generated key>` — required.
+
+**Body** `{ toUserId, amount, currency?, note?, settledAt? }`
+
+**Response `201`** a `Settlement` — `{ id, groupId, fromUserId, fromUserName, toUserId, toUserName, currency, amount, baseCurrency, amountBase, fxRateToBase, note, hasReceipt, status, settledAt, createdById, createdAt }`
+
+Errors: `400 IDEMPOTENCY_KEY_REQUIRED`, `422 INVALID_PARTICIPANT` (recipient not an active member),
+`422 UNSUPPORTED_CURRENCY`, `422 VALIDATION_ERROR`.
+
+### `POST /settlements/:id/confirm`
+
+Requires being the settlement's `toUserId` (the receiver). Row-locks the settlement
+(`SELECT ... FOR UPDATE`) before transitioning, so two concurrent confirms on the same settlement
+can't both succeed — the second sees the already-`CONFIRMED` status and `409`s. Writes two
+`LedgerEntry` rows (payer `+`, receiver `-`, `counterpartyId` set to the other party).
+
+**Response `200`** the updated `Settlement`.
+
+Errors: `403 FORBIDDEN` (not the receiver), `404 NOT_FOUND`, `409 SETTLEMENT_NOT_PENDING`.
+
+### `POST /settlements/:id/reject`
+
+Requires being the settlement's `toUserId`. Same row-locking as confirm; no ledger entries are
+ever written for a rejected settlement.
+
+**Response `200`** the updated `Settlement`.
+
+Errors: `403 FORBIDDEN`, `404 NOT_FOUND`, `409 SETTLEMENT_NOT_PENDING`.
+
+### `POST /settlements/:id/receipt`
+
+Requires being the settlement's `fromUserId` (the payer). Multipart upload, field name `receipt`,
+≤5 MB, JPEG/PNG/WEBP only — validated by magic bytes, not the client-supplied mime type. Stored
+via a `StorageAdapter` (local disk in dev; S3-shaped later).
+
+**Body** `multipart/form-data` with a `receipt` file field.
+
+**Response `200`** the updated `Settlement` (`hasReceipt: true`).
+
+Errors: `403 FORBIDDEN`, `404 NOT_FOUND`, `422 INVALID_RECEIPT` (wrong type or over the size limit).
+
+### `GET /settlements/:id/receipt`
+
+Requires membership in the settlement's group — "signed, auth-checked route, never a raw public
+path" per project.md §5, satisfied here by requiring the normal `Authorization` header and a
+membership check on every read; there is no static-file path serving uploads directly.
+
+**Response `200`** the raw image bytes, with the correct `Content-Type`.
+
+Errors: `404 NOT_FOUND`, `404 RECEIPT_NOT_FOUND` (no receipt uploaded, or the file is missing).
+
 ## Error codes reference
 
 | Code | Status | Where |
@@ -247,4 +313,8 @@ for the "N transactions → M" comparison.
 | `INVALID_PARTICIPANT` | 422 | a split/payer userId isn't an active member of the group |
 | `IF_MATCH_REQUIRED` | 400 | `PATCH /expenses/:id` without a valid `If-Match` header |
 | `STALE_VERSION` | 409 | `If-Match` doesn't match the expense's current version |
+| `IDEMPOTENCY_KEY_REQUIRED` | 400 | `POST /groups/:id/settlements` without an `Idempotency-Key` header |
+| `SETTLEMENT_NOT_PENDING` | 409 | confirm/reject on a settlement that's already `CONFIRMED`/`REJECTED` |
+| `INVALID_RECEIPT` | 422 | receipt upload isn't a JPEG/PNG/WEBP, or exceeds 5MB |
+| `RECEIPT_NOT_FOUND` | 404 | no receipt uploaded for this settlement, or the stored file is missing |
 | `INTERNAL_ERROR` | 500 | unhandled error |

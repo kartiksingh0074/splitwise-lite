@@ -11,6 +11,9 @@ coverage/
 # Prisma
 server/prisma/migrations/**/migration.sql.bak
 
+# Local receipt uploads (dev StorageAdapter)
+server/uploads/
+
 # Vite
 web/dist/
 

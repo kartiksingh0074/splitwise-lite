@@ -14,6 +14,7 @@ beforeEach(async () => {
     prisma.expense.deleteMany(),
   ]);
 
+  await prisma.settlement.deleteMany();
   await prisma.groupInvite.deleteMany();
   await prisma.groupMember.deleteMany();
   await prisma.group.deleteMany();

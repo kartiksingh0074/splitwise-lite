@@ -9,6 +9,11 @@ const envSchema = z.object({
     .default("info"),
   WEB_ORIGIN: z.string().default("http://localhost:5173"),
   JWT_ACCESS_SECRET: z.string().min(32),
+  UPLOAD_DIR: z.string().default("./uploads"),
+  AUTO_CONFIRM_SETTLEMENTS: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
 });
 
 export const env = envSchema.parse(process.env);
