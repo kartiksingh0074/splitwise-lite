@@ -211,9 +211,12 @@ for anyone with no ledger activity yet), computed from `LedgerEntry` — the sou
 `pairwise` is a *derived, informational* "who owes whom directly" view, computed on read from
 current non-deleted expenses (a participant's share is distributed across that expense's payers
 proportional to their contribution, then netted per pair) — not ledger-authoritative, and nothing
-extra is stored for it.
+extra is stored for it. `byCurrency` is the same kind of derive-on-read view, alongside the
+base-currency `net` — one row per (user, currency) with a nonzero contribution, summing
+non-deleted `Expense`/`ExpensePayer`/`ExpenseSplit` original-currency amounts plus confirmed
+`Settlement` amounts in that currency (no FX needed, same-currency sums don't need converting).
 
-**Response `200`** `{ net: [{userId, name, amount}], pairwise: [{from, fromName, to, toName, amount}] }`
+**Response `200`** `{ net: [{userId, name, amount}], pairwise: [{from, fromName, to, toName, amount}], byCurrency: [{userId, name, currency, amount}] }`
 
 ### `GET /groups/:id/settle-plan`
 

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import {
   createInvite,
   getGroup,
@@ -7,7 +7,7 @@ import {
   updateGroup,
   type GroupDetail,
 } from "../features/groups/api.ts";
-import { deleteExpense, listExpenses, type Expense } from "../features/expenses/api.ts";
+import { deleteExpense, listExpenses } from "../features/expenses/api.ts";
 import { getBalances, getSettlePlan } from "../features/balances/api.ts";
 import {
   confirmSettlement,
@@ -16,10 +16,13 @@ import {
   type Settlement,
 } from "../features/settlements/api.ts";
 import { listActivity, type ActivityEntry } from "../features/activity/api.ts";
+import { PageSkeleton } from "../components/Skeleton.tsx";
 import { activityLink, formatActivityLabel, formatDayHeading, groupByDay } from "../features/activity/format.ts";
-import { ApiError } from "../lib/api.ts";
+import { friendlyErrorMessage } from "../lib/errorMessages.ts";
 import { useAuthStore } from "../stores/authStore.ts";
 import { selectDisplayedTransfers, useBalancesStore } from "../stores/balancesStore.ts";
+import { showErrorToast } from "../stores/toastStore.ts";
+import { useExpensesStore } from "../stores/expensesStore.ts";
 
 const TABS = ["Members", "Expenses", "Balances", "Activity"] as const;
 type Tab = (typeof TABS)[number];
@@ -27,15 +30,18 @@ type Tab = (typeof TABS)[number];
 export function GroupDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const userId = useAuthStore((state) => state.user?.id);
 
   const [group, setGroup] = useState<GroupDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("Members");
+  const [tab, setTab] = useState<Tab>((location.state as { tab?: Tab } | null)?.tab ?? "Members");
   const [renaming, setRenaming] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [inviteCode, setInviteCode] = useState<string | null>(null);
-  const [expenses, setExpenses] = useState<Expense[] | null>(null);
+  const expenses = useExpensesStore((state) => (id ? state.byGroup[id] : undefined));
+  const setExpenses = useExpensesStore((state) => state.setExpenses);
+  const removeExpenseFromStore = useExpensesStore((state) => state.removeExpense);
   const balancesData = useBalancesStore((state) => state.balances);
   const settlePlan = useBalancesStore((state) => state.settlePlan);
   const view = useBalancesStore((state) => state.view);
@@ -81,7 +87,7 @@ export function GroupDetailPage() {
   const loadExpenses = () => {
     if (!id) return;
     listExpenses(id)
-      .then((res) => setExpenses(res.expenses))
+      .then((res) => setExpenses(id, res.expenses))
       .catch(() => setError("Couldn't load expenses."));
   };
 
@@ -116,9 +122,10 @@ export function GroupDetailPage() {
   const handleDeleteExpense = async (expenseId: string) => {
     try {
       await deleteExpense(expenseId);
-      loadExpenses();
+      if (id) removeExpenseFromStore(id, expenseId);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't delete that expense.");
+      setError(friendlyErrorMessage(err));
+      showErrorToast(err);
     }
   };
 
@@ -129,7 +136,8 @@ export function GroupDetailPage() {
       setRenaming(false);
       load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't rename the group.");
+      setError(friendlyErrorMessage(err));
+      showErrorToast(err);
     }
   };
 
@@ -139,7 +147,8 @@ export function GroupDetailPage() {
       const invite = await createInvite(id);
       setInviteCode(invite.code);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't create an invite.");
+      setError(friendlyErrorMessage(err));
+      showErrorToast(err);
     }
   };
 
@@ -149,7 +158,8 @@ export function GroupDetailPage() {
       loadSettlements();
       loadBalances();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't confirm that settlement.");
+      setError(friendlyErrorMessage(err));
+      showErrorToast(err);
     }
   };
 
@@ -158,7 +168,8 @@ export function GroupDetailPage() {
       await rejectSettlement(settlementId);
       loadSettlements();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't reject that settlement.");
+      setError(friendlyErrorMessage(err));
+      showErrorToast(err);
     }
   };
 
@@ -168,20 +179,21 @@ export function GroupDetailPage() {
       await removeMember(id, targetUserId);
       load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't remove that member.");
+      setError(friendlyErrorMessage(err));
+      showErrorToast(err);
     }
   };
 
   if (error && !group) {
-    return <p className="mx-auto max-w-2xl px-6 py-10 text-sm text-red-600">{error}</p>;
+    return <p className="mx-auto max-w-2xl px-4 py-10 sm:px-6 text-sm text-red-600">{error}</p>;
   }
 
   if (!group) {
-    return <p className="mx-auto max-w-2xl px-6 py-10 text-sm text-slate-500">Loading…</p>;
+    return <PageSkeleton />;
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-10">
+    <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
       <div className="mb-6 flex items-center justify-between">
         {renaming ? (
           <div className="flex items-center gap-2">
@@ -212,12 +224,12 @@ export function GroupDetailPage() {
 
       {error && <p className="mb-4 text-sm text-red-600">{error}</p>}
 
-      <div className="mb-4 flex gap-4 border-b border-slate-200 text-sm">
+      <div className="mb-4 flex gap-4 overflow-x-auto border-b border-slate-200 text-sm">
         {TABS.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`-mb-px border-b-2 px-1 py-2 ${
+            className={`-mb-px shrink-0 border-b-2 px-1 py-2 ${
               tab === t ? "border-slate-900 font-medium text-slate-900" : "border-transparent text-slate-500"
             }`}
           >
@@ -287,13 +299,19 @@ export function GroupDetailPage() {
           <ul className="flex flex-col gap-2">
             {expenses?.map((expense) => {
               const canEdit = isOwner || expense.createdById === userId;
+              const isPending = expense.id.startsWith("temp-");
               return (
                 <li
                   key={expense.id}
-                  className="flex items-center justify-between rounded border border-slate-200 bg-white px-4 py-3"
+                  className={`flex items-center justify-between rounded border px-4 py-3 ${
+                    isPending ? "border-slate-200 bg-slate-50 opacity-70" : "border-slate-200 bg-white"
+                  }`}
                 >
                   <div>
-                    <p className="font-medium text-slate-900">{expense.description}</p>
+                    <p className="font-medium text-slate-900">
+                      {expense.description}
+                      {isPending && <span className="ml-2 text-xs font-normal text-slate-500">Saving…</span>}
+                    </p>
                     <p className="text-xs text-slate-500">
                       {expense.currency} {expense.amount}
                       {expense.currency !== expense.baseCurrency &&
@@ -302,7 +320,7 @@ export function GroupDetailPage() {
                       {new Date(expense.paidAt).toLocaleDateString()}
                     </p>
                   </div>
-                  {canEdit && (
+                  {canEdit && !isPending && (
                     <div className="flex items-center gap-3 text-sm">
                       <Link
                         to={`/groups/${id}/expenses/${expense.id}/edit`}
@@ -360,6 +378,26 @@ export function GroupDetailPage() {
               })}
             </div>
           </div>
+
+          {balancesData && balancesData.byCurrency.length > 0 && (
+            <div>
+              <h2 className="mb-2 text-sm font-semibold text-slate-900">Per-currency breakdown</h2>
+              <ul className="flex flex-col gap-1 text-sm">
+                {balancesData.byCurrency.map((b, i) => {
+                  const amount = Number(b.amount);
+                  return (
+                    <li key={`${b.userId}-${b.currency}-${i}`} className="text-slate-600">
+                      <span className="font-medium text-slate-900">{b.name}</span>:{" "}
+                      <span className={amount > 0 ? "text-green-700" : amount < 0 ? "text-red-700" : ""}>
+                        {amount > 0 && "+"}
+                        {b.currency} {b.amount}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
 
           <div>
             <div className="mb-2 flex items-center justify-between">
@@ -446,7 +484,7 @@ export function GroupDetailPage() {
                   .map((s) => (
                     <li
                       key={s.id}
-                      className="flex items-center justify-between rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm"
+                      className="flex flex-col gap-2 rounded border border-amber-200 bg-amber-50 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between"
                     >
                       <div>
                         <span className="font-medium text-slate-900">{s.fromUserName}</span>
@@ -456,6 +494,9 @@ export function GroupDetailPage() {
                         <span className="font-medium text-slate-900">
                           {s.currency} {s.amount}
                         </span>
+                        {s.currency !== s.baseCurrency && (
+                          <span className="text-slate-500"> ({s.baseCurrency} {s.amountBase})</span>
+                        )}
                       </div>
                       {s.toUserId === userId ? (
                         <div className="flex gap-3">

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { listGroups, type GroupSummary } from "../features/groups/api.ts";
+import { Skeleton } from "../components/Skeleton.tsx";
+import { showErrorToast } from "../stores/toastStore.ts";
 
 export function GroupsListPage() {
   const [groups, setGroups] = useState<GroupSummary[] | null>(null);
@@ -9,11 +11,14 @@ export function GroupsListPage() {
   useEffect(() => {
     listGroups()
       .then((res) => setGroups(res.groups))
-      .catch(() => setError("Couldn't load groups."));
+      .catch((err) => {
+        setError("Couldn't load groups.");
+        showErrorToast(err);
+      });
   }, []);
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-10">
+    <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
       <div className="mb-6 flex items-center justify-between">
         <h1 className="text-xl font-semibold text-slate-900">Groups</h1>
         <Link
@@ -25,6 +30,13 @@ export function GroupsListPage() {
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
+
+      {groups === null && (
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-14 w-full" />
+          <Skeleton className="h-14 w-full" />
+        </div>
+      )}
 
       {groups && groups.length === 0 && (
         <p className="text-sm text-slate-600">You're not in any groups yet.</p>

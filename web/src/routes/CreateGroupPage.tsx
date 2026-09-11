@@ -50,7 +50,7 @@ export function CreateGroupPage() {
   };
 
   return (
-    <div className="mx-auto max-w-md px-6 py-10">
+    <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
       <form
         onSubmit={handleSubmit(onSubmit)}
         className="flex flex-col gap-4 rounded-lg bg-white p-6 shadow"

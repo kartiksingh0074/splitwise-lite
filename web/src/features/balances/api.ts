@@ -14,9 +14,17 @@ export interface PairwiseDebt {
   amount: string;
 }
 
+export interface CurrencyBalance {
+  userId: string;
+  name: string;
+  currency: string;
+  amount: string;
+}
+
 export interface Balances {
   net: NetBalance[];
   pairwise: PairwiseDebt[];
+  byCurrency: CurrencyBalance[];
 }
 
 export interface SettlePlan {

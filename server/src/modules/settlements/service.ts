@@ -6,12 +6,11 @@ import { recordActivity } from "../../lib/activity.js";
 import { ApiError } from "../../middleware/errorHandler.js";
 import { env } from "../../config/env.js";
 import { formatMinor, parseMinor } from "../../domain/money.js";
-import { StaticRateProvider, convertMinor, formatRateForStorage, FxError } from "../../domain/fx.js";
+import { rateProvider, convertMinor, formatRateForStorage, FxError } from "../../domain/fx.js";
 import { contentTypeFor, detectImageType, extensionFor } from "../../lib/imageType.js";
 import { LocalDiskStorageAdapter, type StorageAdapter } from "../../lib/storage.js";
 import type { createSettlementSchema } from "./schemas.js";
 
-const rateProvider = new StaticRateProvider();
 const storage: StorageAdapter = new LocalDiskStorageAdapter(env.UPLOAD_DIR);
 
 const MAX_RECEIPT_BYTES = 5 * 1024 * 1024;

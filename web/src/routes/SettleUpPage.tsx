@@ -2,8 +2,9 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { getGroup, type GroupMemberInfo } from "../features/groups/api.ts";
 import { createSettlement, uploadReceipt } from "../features/settlements/api.ts";
-import { ApiError } from "../lib/api.ts";
+import { friendlyErrorMessage } from "../lib/errorMessages.ts";
 import { useAuthStore } from "../stores/authStore.ts";
+import { showErrorToast } from "../stores/toastStore.ts";
 
 interface PrefillState {
   toUserId?: string;
@@ -31,7 +32,10 @@ export function SettleUpPage() {
     if (!groupId) return;
     getGroup(groupId)
       .then((g) => setMembers(g.members.filter((m) => m.userId !== currentUserId)))
-      .catch(() => setError("Couldn't load group members."));
+      .catch((err) => {
+        setError("Couldn't load group members.");
+        showErrorToast(err);
+      });
   }, [groupId, currentUserId]);
 
   useEffect(() => {
@@ -62,14 +66,15 @@ export function SettleUpPage() {
       }
       navigate(`/groups/${groupId}`);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't record the settlement.");
+      setError(friendlyErrorMessage(err));
+      showErrorToast(err);
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="mx-auto max-w-md px-6 py-10">
+    <div className="mx-auto max-w-md px-4 py-10 sm:px-6">
       <form
         onSubmit={handleSubmit}
         className="flex flex-col gap-4 rounded-lg bg-white p-6 shadow"

@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import request from "supertest";
 import { createApp } from "../src/app.js";
@@ -37,20 +38,37 @@ async function setupGroup(n: number, prefix: string) {
 async function addExpense(
   groupId: string,
   token: string,
-  opts: { description: string; amount: string; payerId: string; participantIds: string[] },
+  opts: {
+    description: string;
+    amount: string;
+    payerId: string;
+    participantIds: string[];
+    currency?: string;
+  },
 ) {
   return request(app)
     .post(`/api/v1/groups/${groupId}/expenses`)
     .set(authHeader(token))
     .send({
       description: opts.description,
-      currency: "USD",
+      currency: opts.currency ?? "USD",
       amount: opts.amount,
       splitType: "EQUAL",
       splits: opts.participantIds.map((userId) => ({ userId })),
       payers: [{ userId: opts.payerId }],
       paidAt: new Date().toISOString(),
     });
+}
+
+function recordSettlement(
+  groupId: string,
+  token: string,
+  body: { toUserId: string; amount: string; currency?: string },
+) {
+  return request(app)
+    .post(`/api/v1/groups/${groupId}/settlements`)
+    .set({ ...authHeader(token), "Idempotency-Key": randomUUID() })
+    .send(body);
 }
 
 describe("GET /groups/:id/balances", () => {
@@ -92,6 +110,43 @@ describe("GET /groups/:id/balances", () => {
       .set(authHeader(stranger.accessToken));
 
     expect(res.status).toBe(404);
+  });
+
+  it("byCurrency reflects per-currency net contributions, including confirmed settlements", async () => {
+    const { users, groupId } = await setupGroup(2, "cur");
+    const ids = users.map((u) => u.user.id);
+
+    // A pays 100 EUR split equally: A nets +50 EUR, B nets -50 EUR.
+    await addExpense(groupId, users[0]!.accessToken, {
+      description: "Dinner in Paris",
+      amount: "100.00",
+      currency: "EUR",
+      payerId: ids[0]!,
+      participantIds: ids,
+    });
+
+    // B pays A 20 EUR back, confirmed: A -20 EUR, B +20 EUR.
+    const settlement = await recordSettlement(groupId, users[1]!.accessToken, {
+      toUserId: ids[0]!,
+      amount: "20.00",
+      currency: "EUR",
+    });
+    await request(app)
+      .post(`/api/v1/settlements/${settlement.body.id}/confirm`)
+      .set(authHeader(users[0]!.accessToken));
+
+    const res = await request(app)
+      .get(`/api/v1/groups/${groupId}/balances`)
+      .set(authHeader(users[0]!.accessToken));
+
+    expect(res.status).toBe(200);
+    const eurByUser = new Map<string, string>(
+      res.body.byCurrency
+        .filter((b: { currency: string }) => b.currency === "EUR")
+        .map((b: { userId: string; amount: string }) => [b.userId, b.amount]),
+    );
+    expect(eurByUser.get(ids[0]!)).toBe("30.00");
+    expect(eurByUser.get(ids[1]!)).toBe("-30.00");
   });
 });
 

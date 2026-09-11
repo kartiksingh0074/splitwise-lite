@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { logout } from "../features/auth/api.ts";
 import { useAuthStore } from "../stores/authStore.ts";
+import { ToastContainer } from "./ToastContainer.tsx";
 
 const navLinkClass = ({ isActive }: { isActive: boolean }) =>
   isActive ? "font-semibold text-slate-900" : "text-slate-600 hover:text-slate-900";
@@ -22,7 +23,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-6 py-3">
+      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
         <nav className="flex items-center gap-4 text-sm">
           <NavLink to="/" end className={navLinkClass}>
             Home
@@ -32,13 +33,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </NavLink>
         </nav>
         <div className="flex items-center gap-3 text-sm text-slate-600">
-          {user && <span>{user.name}</span>}
+          {user && <span className="hidden sm:inline">{user.name}</span>}
           <button type="button" onClick={handleLogout} className="text-slate-900 underline">
             Log out
           </button>
         </div>
       </header>
       <main>{children}</main>
+      <ToastContainer />
     </div>
   );
 }

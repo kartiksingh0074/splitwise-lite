@@ -8,11 +8,15 @@ import {
   createExpense,
   getExpense,
   updateExpense,
+  type Expense,
   type SplitType,
 } from "../features/expenses/api.ts";
-import { ApiError } from "../lib/api.ts";
+import { PageSkeleton } from "../components/Skeleton.tsx";
+import { friendlyErrorMessage } from "../lib/errorMessages.ts";
 import { useAuthStore } from "../stores/authStore.ts";
 import { selectRemainingToAllocate, useExpenseFormStore } from "../stores/expenseFormStore.ts";
+import { useExpensesStore } from "../stores/expensesStore.ts";
+import { showErrorToast } from "../stores/toastStore.ts";
 
 const SPLIT_TYPES: SplitType[] = ["EQUAL", "EXACT", "PERCENT", "SHARES"];
 
@@ -144,31 +148,67 @@ export function ExpenseFormPage() {
       paidAt: new Date(scalar.paidAt).toISOString(),
     };
 
-    try {
-      if (isEdit && expenseId && version !== null) {
+    if (isEdit && expenseId && version !== null) {
+      try {
         await updateExpense(expenseId, version, payload);
-      } else if (groupId) {
-        await createExpense(groupId, payload);
+        navigate(`/groups/${groupId}`);
+      } catch (err) {
+        setError(friendlyErrorMessage(err));
+        showErrorToast(err);
       }
-      navigate(`/groups/${groupId}`);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Something went wrong.");
+      return;
     }
+
+    if (!groupId) return;
+
+    // Optimistic create: show it in the group's Expenses tab immediately, then reconcile with
+    // the real response (or roll back + toast) once the request settles in the background.
+    const tempId = `temp-${crypto.randomUUID()}`;
+    const nowIso = new Date().toISOString();
+    const optimisticExpense: Expense = {
+      id: tempId,
+      groupId,
+      description: payload.description,
+      category: payload.category ?? null,
+      currency: payload.currency,
+      amount: payload.amount,
+      baseCurrency: payload.currency,
+      amountBase: payload.amount,
+      fxRateToBase: "1",
+      splitType: payload.splitType,
+      paidAt: payload.paidAt,
+      createdById: currentUserId ?? "",
+      version: 1,
+      createdAt: nowIso,
+      updatedAt: nowIso,
+      payers: [],
+      splits: [],
+    };
+
+    useExpensesStore.getState().addOptimistic(groupId, optimisticExpense);
+    navigate(`/groups/${groupId}`, { state: { tab: "Expenses" } });
+
+    createExpense(groupId, payload)
+      .then((real) => useExpensesStore.getState().commit(groupId, tempId, real))
+      .catch((err) => {
+        useExpensesStore.getState().rollback(groupId, tempId);
+        showErrorToast(err);
+      });
   };
 
   if (loading) {
-    return <p className="mx-auto max-w-2xl px-6 py-10 text-sm text-slate-500">Loading…</p>;
+    return <PageSkeleton />;
   }
 
   return (
-    <div className="mx-auto max-w-2xl px-6 py-10">
+    <div className="mx-auto max-w-2xl px-4 py-10 sm:px-6">
       <h1 className="mb-6 text-xl font-semibold text-slate-900">
         {isEdit ? "Edit expense" : "Add expense"}
       </h1>
 
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">
-        <div className="grid grid-cols-2 gap-4 rounded-lg bg-white p-6 shadow">
-          <div className="col-span-2 flex flex-col gap-1">
+        <div className="grid grid-cols-1 gap-4 rounded-lg bg-white p-6 shadow sm:grid-cols-2">
+          <div className="col-span-1 flex flex-col gap-1 sm:col-span-2">
             <label className="text-sm text-slate-700">Description</label>
             <input className="rounded border border-slate-300 px-3 py-2" {...register("description")} />
             {errors.description && <p className="text-sm text-red-600">{errors.description.message}</p>}

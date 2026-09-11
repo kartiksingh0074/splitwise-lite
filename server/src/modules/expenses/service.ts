@@ -6,10 +6,8 @@ import { recordActivity } from "../../lib/activity.js";
 import { ApiError } from "../../middleware/errorHandler.js";
 import { formatMinor, parseMinor } from "../../domain/money.js";
 import { computeSplit, SplitError } from "../../domain/split.js";
-import { StaticRateProvider, convertMinor, formatRateForStorage, FxError } from "../../domain/fx.js";
+import { rateProvider, convertMinor, formatRateForStorage, FxError } from "../../domain/fx.js";
 import type { expenseWriteSchema, listExpensesQuerySchema } from "./schemas.js";
-
-const rateProvider = new StaticRateProvider();
 
 type ExpenseInput = z.infer<typeof expenseWriteSchema>;
 type ListQuery = z.infer<typeof listExpensesQuerySchema>;

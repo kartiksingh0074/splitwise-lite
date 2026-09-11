@@ -101,6 +101,59 @@ async function getRawPairwiseView(
   return netted;
 }
 
+/**
+ * Per-currency net contribution per user, derived the same way as the pairwise view (current
+ * non-deleted Expense/ExpensePayer/ExpenseSplit rows -- no FX needed, same-currency sums don't
+ * need converting) plus confirmed Settlement rows (which the pairwise view doesn't need, but a
+ * currency breakdown of "what do I actually owe/am owed" should, since settlements change that).
+ */
+async function getRawByCurrencyBalances(
+  groupId: string,
+): Promise<{ userId: string; currency: string; amountMinor: bigint }[]> {
+  const [expenses, settlements] = await Promise.all([
+    prisma.expense.findMany({
+      where: { groupId, deletedAt: null },
+      select: {
+        currency: true,
+        payers: { select: { userId: true, amountMinor: true } },
+        splits: { select: { userId: true, amountMinor: true } },
+      },
+    }),
+    prisma.settlement.findMany({
+      where: { groupId, status: "CONFIRMED" },
+      select: { fromUserId: true, toUserId: true, currency: true, amountMinor: true },
+    }),
+  ]);
+
+  const net = new Map<string, bigint>();
+  const add = (userId: string, currency: string, amount: bigint) => {
+    const key = `${userId}:${currency}`;
+    net.set(key, (net.get(key) ?? 0n) + amount);
+  };
+
+  for (const expense of expenses) {
+    for (const payer of expense.payers) {
+      add(payer.userId, expense.currency, payer.amountMinor);
+    }
+    for (const split of expense.splits) {
+      add(split.userId, expense.currency, -split.amountMinor);
+    }
+  }
+
+  for (const s of settlements) {
+    add(s.fromUserId, s.currency, s.amountMinor);
+    add(s.toUserId, s.currency, -s.amountMinor);
+  }
+
+  const result: { userId: string; currency: string; amountMinor: bigint }[] = [];
+  for (const [key, amountMinor] of net) {
+    if (amountMinor === 0n) continue;
+    const [userId, currency] = key.split(":") as [string, string];
+    result.push({ userId, currency, amountMinor });
+  }
+  return result;
+}
+
 async function namesFor(userIds: string[]): Promise<Map<string, string>> {
   const users = await prisma.user.findMany({
     where: { id: { in: [...new Set(userIds)] } },
@@ -111,12 +164,16 @@ async function namesFor(userIds: string[]): Promise<Map<string, string>> {
 
 export async function getBalances(groupId: string) {
   const baseCurrency = await getBaseCurrency(groupId);
-  const [net, pairwise] = await Promise.all([
+  const [net, pairwise, byCurrencyRaw] = await Promise.all([
     getRawNetBalances(groupId),
     getRawPairwiseView(groupId),
+    getRawByCurrencyBalances(groupId),
   ]);
 
-  const names = await namesFor(pairwise.flatMap((p) => [p.from, p.to]));
+  const names = await namesFor([
+    ...pairwise.flatMap((p) => [p.from, p.to]),
+    ...byCurrencyRaw.map((b) => b.userId),
+  ]);
 
   return {
     net: net.map((b) => ({
@@ -130,6 +187,12 @@ export async function getBalances(groupId: string) {
       to: p.to,
       toName: names.get(p.to) ?? "",
       amount: formatMinor(p.amountMinor, baseCurrency),
+    })),
+    byCurrency: byCurrencyRaw.map((b) => ({
+      userId: b.userId,
+      name: names.get(b.userId) ?? "",
+      currency: b.currency,
+      amount: formatMinor(b.amountMinor, b.currency),
     })),
   };
 }
