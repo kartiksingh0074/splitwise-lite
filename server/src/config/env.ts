@@ -8,6 +8,9 @@ const envSchema = z.object({
     .enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"])
     .default("info"),
   WEB_ORIGIN: z.string().default("http://localhost:5173"),
+  // Comma-separated allowlist for CORS. Falls back to just WEB_ORIGIN if unset, so existing
+  // single-origin dev setups keep working without any config change.
+  CORS_ALLOWED_ORIGINS: z.string().optional(),
   JWT_ACCESS_SECRET: z.string().min(32),
   UPLOAD_DIR: z.string().default("./uploads"),
   AUTO_CONFIRM_SETTLEMENTS: z

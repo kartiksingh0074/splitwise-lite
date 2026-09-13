@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatMinor, getCurrencyDecimals, parseMinor } from "../src/domain/money.js";
+import { addMinor, formatMinor, getCurrencyDecimals, parseMinor, subMinor } from "../src/domain/money.js";
 
 describe("money", () => {
   it("parses and formats a 2-decimal currency round trip", () => {
@@ -12,6 +12,10 @@ describe("money", () => {
     expect(getCurrencyDecimals("JPY")).toBe(0);
     expect(parseMinor("15000", "JPY")).toBe(15000n);
     expect(formatMinor(15000n, "JPY")).toBe("15000");
+  });
+
+  it("formats a negative zero-decimal amount (e.g. a JPY ledger reversal)", () => {
+    expect(formatMinor(-15000n, "JPY")).toBe("-15000");
   });
 
   it("rejects more precision than the currency supports", () => {
@@ -27,5 +31,10 @@ describe("money", () => {
   it("round-trips negative amounts (for ledger deltas)", () => {
     expect(parseMinor("-50.00", "USD")).toBe(-5000n);
     expect(formatMinor(-5000n, "USD")).toBe("-50.00");
+  });
+
+  it("addMinor and subMinor do exact bigint arithmetic", () => {
+    expect(addMinor(100n, 50n)).toBe(150n);
+    expect(subMinor(100n, 150n)).toBe(-50n);
   });
 });

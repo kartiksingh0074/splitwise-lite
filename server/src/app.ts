@@ -1,8 +1,10 @@
 import express from "express";
+import helmet from "helmet";
 import { pinoHttp } from "pino-http";
 import { logger } from "./config/logger.js";
 import { requestId } from "./middleware/requestId.js";
 import { cors } from "./middleware/cors.js";
+import { globalRateLimit } from "./middleware/globalRateLimit.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { authRouter } from "./modules/auth/routes.js";
 import { usersRouter } from "./modules/users/routes.js";
@@ -21,8 +23,16 @@ export function createApp() {
       genReqId: (req) => req.id,
     }),
   );
+  app.use(
+    helmet({
+      // The receipt endpoint is fetched cross-origin by the dev frontend (a different port);
+      // Helmet's default same-origin CORP would silently block that read.
+      crossOriginResourcePolicy: { policy: "cross-origin" },
+    }),
+  );
   app.use(cors);
-  app.use(express.json());
+  app.use(globalRateLimit);
+  app.use(express.json({ limit: "1mb" }));
 
   app.get("/api/v1/health", (_req, res) => {
     res.status(200).json({ status: "ok" });

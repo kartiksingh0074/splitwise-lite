@@ -25,5 +25,43 @@ services:
       postgres:
         condition: service_healthy
 
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    restart: unless-stopped
+    # Dev-only defaults matching server/.env.example, adjusted for the compose network
+    # (DATABASE_URL/WEB_ORIGIN point at other services/ports, not localhost). Baked in directly
+    # rather than via env_file so `docker compose up` works on a fresh clone with no setup step.
+    environment:
+      DATABASE_URL: postgresql://splitwise:splitwise@postgres:5432/splitwise?schema=public
+      PORT: 4000
+      NODE_ENV: development
+      LOG_LEVEL: info
+      WEB_ORIGIN: http://localhost:5173
+      JWT_ACCESS_SECRET: dev-only-secret-change-me-please-32chars-min
+      UPLOAD_DIR: ./uploads
+      AUTO_CONFIRM_SETTLEMENTS: "false"
+    ports:
+      - "4000:4000"
+    volumes:
+      - server-uploads:/app/server/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+      args:
+        VITE_API_BASE_URL: http://localhost:4000/api/v1
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    depends_on:
+      - server
+
 volumes:
   postgres-data:
+  server-uploads:

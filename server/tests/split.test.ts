@@ -91,6 +91,156 @@ describe("computeSplit", () => {
   });
 });
 
+describe("computeSplit: input validation", () => {
+  it("rejects an empty participant list", () => {
+    expect(() =>
+      computeSplit({ totalMinor: 100n, participants: [], splitType: "EQUAL", seed: "x" }),
+    ).toThrow(SplitError);
+  });
+
+  it("rejects a duplicate participant", () => {
+    expect(() =>
+      computeSplit({
+        totalMinor: 100n,
+        participants: ["a", "a"],
+        splitType: "EQUAL",
+        seed: "x",
+      }),
+    ).toThrow(SplitError);
+  });
+
+  it("rejects a negative total", () => {
+    expect(() =>
+      computeSplit({
+        totalMinor: -100n,
+        participants: ["a", "b"],
+        splitType: "EQUAL",
+        seed: "x",
+      }),
+    ).toThrow(SplitError);
+  });
+
+  it("EXACT: rejects a missing input for a participant", () => {
+    expect(() =>
+      computeSplit({
+        totalMinor: 100n,
+        participants: ["a", "b"],
+        splitType: "EXACT",
+        inputs: { a: "100" },
+        seed: "x",
+      }),
+    ).toThrow(SplitError);
+  });
+
+  it("EXACT: rejects a non-integer input", () => {
+    expect(() =>
+      computeSplit({
+        totalMinor: 100n,
+        participants: ["a", "b"],
+        splitType: "EXACT",
+        inputs: { a: "fifty", b: "50" },
+        seed: "x",
+      }),
+    ).toThrow(SplitError);
+  });
+
+  it("PERCENT: rejects a missing input for a participant", () => {
+    expect(() =>
+      computeSplit({
+        totalMinor: 100n,
+        participants: ["a", "b"],
+        splitType: "PERCENT",
+        inputs: { a: "100" },
+        seed: "x",
+      }),
+    ).toThrow(SplitError);
+  });
+
+  it("PERCENT: rejects a malformed (non-decimal) percentage string", () => {
+    expect(() =>
+      computeSplit({
+        totalMinor: 100n,
+        participants: ["a", "b"],
+        splitType: "PERCENT",
+        inputs: { a: "abc", b: "100" },
+        seed: "x",
+      }),
+    ).toThrow(SplitError);
+  });
+
+  it("PERCENT: rejects a negative percentage", () => {
+    expect(() =>
+      computeSplit({
+        totalMinor: 100n,
+        participants: ["a", "b"],
+        splitType: "PERCENT",
+        inputs: { a: "-10", b: "110" },
+        seed: "x",
+      }),
+    ).toThrow(SplitError);
+  });
+
+  it("SHARES: rejects a missing input for a participant", () => {
+    expect(() =>
+      computeSplit({
+        totalMinor: 100n,
+        participants: ["a", "b"],
+        splitType: "SHARES",
+        inputs: { a: "1" },
+        seed: "x",
+      }),
+    ).toThrow(SplitError);
+  });
+
+  it("SHARES: rejects a non-integer input", () => {
+    expect(() =>
+      computeSplit({
+        totalMinor: 100n,
+        participants: ["a", "b"],
+        splitType: "SHARES",
+        inputs: { a: "one", b: "1" },
+        seed: "x",
+      }),
+    ).toThrow(SplitError);
+  });
+
+  it("SHARES: rejects all-zero weights (nothing to allocate proportionally)", () => {
+    expect(() =>
+      computeSplit({
+        totalMinor: 100n,
+        participants: ["a", "b"],
+        splitType: "SHARES",
+        inputs: { a: "0", b: "0" },
+        seed: "x",
+      }),
+    ).toThrow(SplitError);
+  });
+
+  it("EXACT/PERCENT/SHARES: rejects when inputs is omitted entirely", () => {
+    for (const splitType of ["EXACT", "PERCENT", "SHARES"] as const) {
+      expect(() =>
+        computeSplit({ totalMinor: 100n, participants: ["a", "b"], splitType, seed: "x" }),
+      ).toThrow(SplitError);
+    }
+  });
+
+  it("has a stable tie-break by userId when two participants share the largest remainder", () => {
+    // Equal weights on a total not divisible by 3: all three remainders tie exactly, exercising
+    // the tie-break comparator's a.p < b.p branch deterministically.
+    const result = computeSplit({
+      totalMinor: 10n,
+      participants: ["c", "a", "b"],
+      splitType: "SHARES",
+      inputs: { a: "1", b: "1", c: "1" },
+      seed: "x",
+    });
+    // floor(10/3) = 3 each, 1 leftover unit goes to the alphabetically-first tied participant.
+    expect(result.get("a")).toBe(4n);
+    expect(result.get("b")).toBe(3n);
+    expect(result.get("c")).toBe(3n);
+  });
+});
+
 function randomPartition(total: bigint, parts: number): bigint[] {
   if (parts === 1) return [total];
   const totalNum = Number(total);

@@ -19,7 +19,8 @@ function parseScaledDecimal(value: string, scale: number): bigint {
   try {
     return parseScaledDecimalRaw(value, scale);
   } catch (err) {
-    throw new SplitError(err instanceof Error ? err.message : String(err));
+    // money.ts's parseScaledDecimal only ever throws a real Error.
+    throw new SplitError((err as Error).message);
   }
 }
 
@@ -30,15 +31,15 @@ function parseNonNegativeInteger(value: string): bigint {
   return BigInt(value);
 }
 
+// Both helpers below are only ever called from computeEqual, which is only reached after
+// computeSplit's own "at least one participant" guard -- n is always >= 1 here.
 function rotate<T>(arr: T[], offset: number): T[] {
   const n = arr.length;
-  if (n === 0) return [];
   const o = ((offset % n) + n) % n;
   return [...arr.slice(o), ...arr.slice(0, o)];
 }
 
 function seedRotation(seed: string, n: number): number {
-  if (n <= 0) return 0;
   const hash = createHash("sha256").update(seed).digest();
   return hash.readUInt32BE(0) % n;
 }
@@ -99,9 +100,10 @@ function largestRemainderAllocate(
   const remainders: { p: string; rem: bigint }[] = [];
   let allocated = 0n;
 
+  // weightOf's two current callers (computeShares' parseNonNegativeInteger, computePercent's
+  // explicit check) both already guarantee a non-negative weight before it reaches here.
   for (const p of participants) {
     const w = weightOf(p);
-    if (w < 0n) throw new SplitError(`Weight for ${p} must be non-negative`);
     const product = totalMinor * w;
     const floor = product / weightSum;
     const rem = product % weightSum;
@@ -112,9 +114,10 @@ function largestRemainderAllocate(
 
   let leftover = totalMinor - allocated;
 
+  // Participants are always unique (computeSplit rejects duplicates), so a.p === b.p can't happen.
   remainders.sort((a, b) => {
     if (a.rem !== b.rem) return a.rem > b.rem ? -1 : 1;
-    return a.p < b.p ? -1 : a.p > b.p ? 1 : 0;
+    return a.p < b.p ? -1 : 1;
   });
 
   for (let i = 0; i < remainders.length && leftover > 0n; i++) {

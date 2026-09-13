@@ -21,6 +21,16 @@ export function errorHandler(err: unknown, req: Request, res: Response, _next: N
     return;
   }
 
+  // body-parser (express.json's underlying parser) throws a plain http-error for an
+  // over-limit body, not an ApiError -- map it explicitly instead of letting it fall
+  // through to a misleading 500.
+  if (err instanceof Error && (err as { type?: string }).type === "entity.too.large") {
+    res.status(413).json({
+      error: { code: "PAYLOAD_TOO_LARGE", message: "Request body is too large.", details: {} },
+    });
+    return;
+  }
+
   res.status(500).json({
     error: { code: "INTERNAL_ERROR", message: "Something went wrong.", details: {} },
   });

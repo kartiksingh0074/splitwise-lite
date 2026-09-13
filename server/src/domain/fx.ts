@@ -20,26 +20,6 @@ export interface RateProvider {
   getRate(from: string, to: string): bigint;
 }
 
-function usdRate(currency: string): bigint {
-  const raw = USD_RATES[currency.toUpperCase()];
-  if (raw === undefined) {
-    throw new FxError(`No FX rate available for currency: ${currency}`);
-  }
-  return parseScaledDecimal(raw, 8);
-}
-
-export class StaticRateProvider implements RateProvider {
-  getRate(from: string, to: string): bigint {
-    if (from.toUpperCase() === to.toUpperCase()) {
-      return RATE_SCALE;
-    }
-    const fromPerUsd = usdRate(from);
-    const toPerUsd = usdRate(to);
-    // from -> USD -> to :  rate = toPerUsd / fromPerUsd
-    return (toPerUsd * RATE_SCALE) / fromPerUsd;
-  }
-}
-
 export interface RateFetcher {
   fetchRates(): Promise<Record<string, string>>;
 }

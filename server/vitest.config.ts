@@ -16,5 +16,24 @@ export default defineConfig({
     // beforeEach does a full-table cleanup, which races with other files' in-flight
     // transactions under the default file-level parallelism. Run files sequentially.
     fileParallelism: false,
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html"],
+      include: ["src/**"],
+      exclude: ["src/config/**", "src/db/**"],
+      // project.md §8: domain/ at 100% branches, overall backend >= 80%.
+      thresholds: {
+        branches: 80,
+        lines: 80,
+        functions: 80,
+        statements: 80,
+        "src/domain/**": {
+          branches: 100,
+          lines: 100,
+          functions: 100,
+          statements: 100,
+        },
+      },
+    },
   },
 });

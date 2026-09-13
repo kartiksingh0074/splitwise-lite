@@ -49,13 +49,22 @@ describe("CachedRateProvider", () => {
     expect(provider.getRate("USD", "USD")).toBe(RATE_SCALE);
   });
 
-  it("throws FxError for a currency with no known rate", async () => {
+  it("throws FxError when the target currency has no known rate", async () => {
     const provider = new CachedRateProvider(fetcherOnce({ USD: "1", EUR: "0.5" }), {
       autoStart: false,
     });
     await provider.refreshNow();
 
     expect(() => provider.getRate("USD", "ZZZ")).toThrow(FxError);
+  });
+
+  it("throws FxError when the source currency has no known rate", async () => {
+    const provider = new CachedRateProvider(fetcherOnce({ USD: "1", EUR: "0.5" }), {
+      autoStart: false,
+    });
+    await provider.refreshNow();
+
+    expect(() => provider.getRate("ZZZ", "USD")).toThrow(FxError);
   });
 
   it("serves the seed table before any refresh has ever completed", () => {

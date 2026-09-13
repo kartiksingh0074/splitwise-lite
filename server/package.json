@@ -10,13 +10,18 @@
     "check": "tsc --noEmit",
     "test": "vitest run",
     "prisma:migrate": "prisma migrate dev",
-    "prisma:generate": "prisma generate"
+    "prisma:generate": "prisma generate",
+    "seed": "tsx --env-file=.env prisma/seed.ts"
+  },
+  "prisma": {
+    "seed": "tsx --env-file=.env prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "argon2": "^0.45.1",
     "express": "^5.0.1",
     "express-rate-limit": "^8.7.0",
+    "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.3.0",
     "pino": "^9.5.0",
@@ -29,6 +34,7 @@
     "@types/multer": "^2.2.0",
     "@types/node": "^22.9.0",
     "@types/supertest": "^6.0.2",
+    "@vitest/coverage-v8": "^2.1.9",
     "prisma": "^5.22.0",
     "supertest": "^7.0.0",
     "tsx": "^4.19.2",

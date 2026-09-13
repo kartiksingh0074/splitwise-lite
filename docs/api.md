@@ -2,6 +2,19 @@
 
 All routes are prefixed `/api/v1`. Auth via `Authorization: Bearer <accessToken>`.
 
+## Hardening (Phase 8)
+
+- **CORS**: only origins listed in `CORS_ALLOWED_ORIGINS` (comma-separated; defaults to just
+  `WEB_ORIGIN`) get an `Access-Control-Allow-Origin` echoed back — never a wildcard.
+- **Global rate limit**: 300 requests/minute/IP across the whole API (`429` when exceeded), on
+  top of the stricter 10/min/IP limit on the `/auth/*` routes specifically. Both are skipped
+  under `NODE_ENV=test`.
+- **Body size cap**: request bodies over 1MB are rejected with `413 PAYLOAD_TOO_LARGE` (the
+  receipt upload has its own, larger 5MB limit — see `POST /settlements/:id/receipt`).
+- **Helmet** security headers are applied to every response, with `Cross-Origin-Resource-Policy`
+  relaxed to `cross-origin` so the frontend can fetch `GET /settlements/:id/receipt` across ports
+  in dev.
+
 ## Error shape
 
 Every error response has this shape:
@@ -335,4 +348,5 @@ actually changed.
 | `SETTLEMENT_NOT_PENDING` | 409 | confirm/reject on a settlement that's already `CONFIRMED`/`REJECTED` |
 | `INVALID_RECEIPT` | 422 | receipt upload isn't a JPEG/PNG/WEBP, or exceeds 5MB |
 | `RECEIPT_NOT_FOUND` | 404 | no receipt uploaded for this settlement, or the stored file is missing |
+| `PAYLOAD_TOO_LARGE` | 413 | request body exceeds the 1MB cap (see Hardening, above) |
 | `INTERNAL_ERROR` | 500 | unhandled error |

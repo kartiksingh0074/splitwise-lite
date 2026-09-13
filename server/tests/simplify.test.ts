@@ -106,4 +106,19 @@ describe("simplifySubset", () => {
     ];
     expect(simplifySubset(balances).length).toBe(2);
   });
+
+  it("returns no transfers when every balance is already zero", () => {
+    const balances: Balance[] = [
+      { userId: "a", amountMinor: 0n },
+      { userId: "b", amountMinor: 0n },
+    ];
+    expect(simplifySubset(balances)).toEqual([]);
+  });
+
+  it("falls back to simplifyGreedy above the subset-strategy size cap", () => {
+    // 13 non-zero balances: one more than SUBSET_STRATEGY_MAX_N, so the O(3^n) partition
+    // search is skipped and this should just delegate straight to simplifyGreedy.
+    const balances = randomZeroSumBalances(13);
+    expect(simplifySubset(balances)).toEqual(simplifyGreedy(balances));
+  });
 });
