@@ -339,6 +339,53 @@ instead, saved to PDF via the browser's native Print dialog.
 
 Errors: `404 NOT_FOUND` (non-members).
 
+### `GET /groups/:id/recurring-expenses`
+
+Requires membership (any role). Lists the group's recurring-expense templates (not the expenses
+they've already materialized — those show up as normal `Expense` rows once created).
+
+**Response `200`** `{ recurringExpenses: [{ id, groupId, description, category, currency, amount, splitType, splits, payers, interval, nextRunAt, active, createdById, createdAt, updatedAt }] }`
+
+### `POST /groups/:id/recurring-expenses`
+
+Requires membership (any role). Same `splits`/`payers` shape as
+`POST /groups/:id/expenses` (project.md §4.1's split engine), minus `paidAt` — replaced by
+`interval` (`WEEKLY`/`MONTHLY`/`YEARLY`) and `startAt` (the first occurrence's date, which
+becomes the initial `nextRunAt`). An hourly background job (`server/src/modules/recurringExpenses/scheduler.ts`)
+finds due templates and calls the same `createExpense` service function a normal `POST` would —
+full split/payer computation, FX conversion, ledger entries, and activity recording, identical to
+a manually-created expense. If the server was stopped past several occurrences, one tick
+catches up every missed occurrence (capped at 12 per template) rather than skipping to just the
+latest. A template whose stored participant has since left the group is skipped (logged, retried
+next tick) rather than failing the whole batch.
+
+**Body** `{ description, category?, currency, amount, splitType, splits: [{userId, input?}], payers: [{userId, amount?}], interval, startAt }`
+
+**Response `201`** the created template (same shape as the list above).
+
+Errors: `422 INVALID_PARTICIPANT`, `422 VALIDATION_ERROR`.
+
+### `PATCH /recurring-expenses/:id`
+
+Requires the template's creator or the group's `OWNER` (mirrors expense edit/delete
+permissions). `{ active: false }` pauses it (the scheduler skips inactive templates); `{ active: true }`
+resumes it from its current `nextRunAt`.
+
+**Body** `{ active }`
+
+**Response `200`** the updated template.
+
+Errors: `403 FORBIDDEN`, `404 NOT_FOUND`.
+
+### `DELETE /recurring-expenses/:id`
+
+Requires the template's creator or the group's `OWNER`. Deletes the template only — expenses it
+already materialized are real, independent `Expense` rows and are unaffected.
+
+**Response `204`** (no body)
+
+Errors: `403 FORBIDDEN`, `404 NOT_FOUND`.
+
 ## Error codes reference
 
 | Code | Status | Where |

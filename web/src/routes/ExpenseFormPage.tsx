@@ -17,8 +17,13 @@ import { useAuthStore } from "../stores/authStore.ts";
 import { selectRemainingToAllocate, useExpenseFormStore } from "../stores/expenseFormStore.ts";
 import { useExpensesStore } from "../stores/expensesStore.ts";
 import { showErrorToast } from "../stores/toastStore.ts";
+import {
+  createRecurringExpense,
+  type RecurrenceInterval,
+} from "../features/recurringExpenses/api.ts";
 
 const SPLIT_TYPES: SplitType[] = ["EQUAL", "EXACT", "PERCENT", "SHARES"];
+const RECURRENCE_INTERVALS: RecurrenceInterval[] = ["WEEKLY", "MONTHLY", "YEARLY"];
 
 const scalarSchema = z.object({
   description: z.string().min(1, "Description is required").max(200),
@@ -49,6 +54,8 @@ export function ExpenseFormPage() {
   const [version, setVersion] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [recurring, setRecurring] = useState(false);
+  const [recurrenceInterval, setRecurrenceInterval] = useState<RecurrenceInterval>("MONTHLY");
 
   const store = useExpenseFormStore();
 
@@ -161,6 +168,22 @@ export function ExpenseFormPage() {
 
     if (!groupId) return;
 
+    if (recurring) {
+      try {
+        const { paidAt, ...recurringPayload } = payload;
+        await createRecurringExpense(groupId, {
+          ...recurringPayload,
+          interval: recurrenceInterval,
+          startAt: paidAt,
+        });
+        navigate(`/groups/${groupId}`, { state: { tab: "Recurring" } });
+      } catch (err) {
+        setError(friendlyErrorMessage(err));
+        showErrorToast(err);
+      }
+      return;
+    }
+
     // Optimistic create: show it in the group's Expenses tab immediately, then reconcile with
     // the real response (or roll back + toast) once the request settles in the background.
     const tempId = `temp-${crypto.randomUUID()}`;
@@ -240,7 +263,7 @@ export function ExpenseFormPage() {
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-sm text-slate-700">Paid at</label>
+            <label className="text-sm text-slate-700">{recurring ? "Starts on" : "Paid at"}</label>
             <input
               type="datetime-local"
               className="rounded border border-slate-300 px-3 py-2"
@@ -248,6 +271,35 @@ export function ExpenseFormPage() {
             />
             {errors.paidAt && <p className="text-sm text-red-600">{errors.paidAt.message}</p>}
           </div>
+
+          {!isEdit && (
+            <div className="col-span-1 flex flex-col gap-2 sm:col-span-2">
+              <label className="flex items-center gap-2 text-sm text-slate-700">
+                <input
+                  type="checkbox"
+                  checked={recurring}
+                  onChange={(e) => setRecurring(e.target.checked)}
+                />
+                Make this recurring
+              </label>
+              {recurring && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm text-slate-700">Repeats</label>
+                  <select
+                    className="rounded border border-slate-300 px-3 py-2"
+                    value={recurrenceInterval}
+                    onChange={(e) => setRecurrenceInterval(e.target.value as RecurrenceInterval)}
+                  >
+                    {RECURRENCE_INTERVALS.map((i) => (
+                      <option key={i} value={i}>
+                        {i}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="rounded-lg bg-white p-6 shadow">
@@ -338,7 +390,13 @@ export function ExpenseFormPage() {
           disabled={isSubmitting}
           className="rounded bg-slate-900 py-2 text-white disabled:opacity-50"
         >
-          {isSubmitting ? "Saving…" : isEdit ? "Save changes" : "Add expense"}
+          {isSubmitting
+            ? "Saving…"
+            : isEdit
+              ? "Save changes"
+              : recurring
+                ? "Create recurring expense"
+                : "Add expense"}
         </button>
       </form>
     </div>

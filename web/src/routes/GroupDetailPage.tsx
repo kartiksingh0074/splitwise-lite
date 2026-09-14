@@ -17,6 +17,12 @@ import {
 } from "../features/settlements/api.ts";
 import { listActivity, type ActivityEntry } from "../features/activity/api.ts";
 import { getExportCsvBlobUrl } from "../features/export/api.ts";
+import {
+  deleteRecurringExpense,
+  listRecurringExpenses,
+  setRecurringExpenseActive,
+  type RecurringExpense,
+} from "../features/recurringExpenses/api.ts";
 import { PageSkeleton } from "../components/Skeleton.tsx";
 import { activityLink, formatActivityLabel, formatDayHeading, groupByDay } from "../features/activity/format.ts";
 import { friendlyErrorMessage } from "../lib/errorMessages.ts";
@@ -25,7 +31,7 @@ import { selectDisplayedTransfers, useBalancesStore } from "../stores/balancesSt
 import { showErrorToast } from "../stores/toastStore.ts";
 import { useExpensesStore } from "../stores/expensesStore.ts";
 
-const TABS = ["Members", "Expenses", "Balances", "Activity"] as const;
+const TABS = ["Members", "Expenses", "Recurring", "Balances", "Activity"] as const;
 type Tab = (typeof TABS)[number];
 
 export function GroupDetailPage() {
@@ -53,6 +59,7 @@ export function GroupDetailPage() {
   const [activities, setActivities] = useState<ActivityEntry[] | null>(null);
   const [activityCursor, setActivityCursor] = useState<string | null>(null);
   const [activityLoadingMore, setActivityLoadingMore] = useState(false);
+  const [recurringExpenses, setRecurringExpenses] = useState<RecurringExpense[] | null>(null);
 
   const loadActivity = () => {
     if (!id) return;
@@ -92,6 +99,13 @@ export function GroupDetailPage() {
       .catch(() => setError("Couldn't load expenses."));
   };
 
+  const loadRecurringExpenses = () => {
+    if (!id) return;
+    listRecurringExpenses(id)
+      .then((res) => setRecurringExpenses(res.recurringExpenses))
+      .catch(() => setError("Couldn't load recurring expenses."));
+  };
+
   const loadBalances = () => {
     if (!id) return;
     Promise.all([getBalances(id), getSettlePlan(id, "greedy")])
@@ -114,6 +128,7 @@ export function GroupDetailPage() {
 
   useEffect(() => {
     if (tab === "Expenses") loadExpenses();
+    if (tab === "Recurring") loadRecurringExpenses();
     if (tab === "Balances") loadBalances();
     if (tab === "Activity") loadActivity();
   }, [tab, id]);
@@ -151,6 +166,26 @@ export function GroupDetailPage() {
       a.download = `${group.name}-ledger.csv`;
       a.click();
       URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(friendlyErrorMessage(err));
+      showErrorToast(err);
+    }
+  };
+
+  const handleToggleRecurringActive = async (recurringExpenseId: string, active: boolean) => {
+    try {
+      await setRecurringExpenseActive(recurringExpenseId, active);
+      loadRecurringExpenses();
+    } catch (err) {
+      setError(friendlyErrorMessage(err));
+      showErrorToast(err);
+    }
+  };
+
+  const handleDeleteRecurringExpense = async (recurringExpenseId: string) => {
+    try {
+      await deleteRecurringExpense(recurringExpenseId);
+      loadRecurringExpenses();
     } catch (err) {
       setError(friendlyErrorMessage(err));
       showErrorToast(err);
@@ -368,6 +403,59 @@ export function GroupDetailPage() {
           </ul>
         </div>
       )}
+
+      {tab === "Recurring" && (
+        <div className="flex flex-col gap-4">
+          <Link
+            to={`/groups/${id}/expenses/new`}
+            className="self-start rounded bg-slate-900 px-3 py-1.5 text-sm text-white"
+          >
+            Add recurring expense
+          </Link>
+
+          {recurringExpenses && recurringExpenses.length === 0 && (
+            <p className="text-sm text-slate-600">No recurring expenses yet.</p>
+          )}
+
+          <ul className="flex flex-col gap-2">
+            {recurringExpenses?.map((r) => {
+              const canManage = isOwner || r.createdById === userId;
+              return (
+                <li
+                  key={r.id}
+                  className={`flex items-center justify-between rounded border px-4 py-3 ${
+                    r.active ? "border-slate-200 bg-white" : "border-slate-200 bg-slate-50 opacity-70"
+                  }`}
+                >
+                  <div>
+                    <p className="text-sm text-slate-900">{r.description}</p>
+                    <p className="text-xs text-slate-500">
+                      {r.currency} {r.amount} · {r.interval} · next: {new Date(r.nextRunAt).toLocaleDateString()}
+                    </p>
+                  </div>
+                  {canManage && (
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => handleToggleRecurringActive(r.id, !r.active)}
+                        className="text-sm text-slate-600 underline"
+                      >
+                        {r.active ? "Pause" : "Resume"}
+                      </button>
+                      <button
+                        onClick={() => handleDeleteRecurringExpense(r.id)}
+                        className="text-sm text-red-600 underline"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
       {tab === "Balances" && (
         <div className="flex flex-col gap-6">
           <div>

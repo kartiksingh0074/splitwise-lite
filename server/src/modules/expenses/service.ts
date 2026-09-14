@@ -105,7 +105,7 @@ function rescaleToBase(
   return computeSplit({ totalMinor, participants, splitType: "SHARES", inputs, seed });
 }
 
-async function assertActiveMembers(groupId: string, userIds: Set<string>) {
+export async function assertActiveMembers(groupId: string, userIds: Set<string>) {
   const members = await prisma.groupMember.findMany({
     where: { groupId, userId: { in: [...userIds] }, leftAt: null },
     select: { userId: true },

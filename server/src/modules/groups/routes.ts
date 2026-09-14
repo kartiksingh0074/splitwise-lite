@@ -10,6 +10,7 @@ import { balancesRouter } from "../balances/routes.js";
 import { groupSettlementsRouter } from "../settlements/routes.js";
 import { activityRouter } from "../activity/routes.js";
 import { exportRouter } from "../export/routes.js";
+import { groupRecurringExpensesRouter } from "../recurringExpenses/routes.js";
 
 export const groupsRouter = Router();
 
@@ -83,3 +84,8 @@ groupsRouter.use("/:id/settlements", requireGroupRole("MEMBER"), groupSettlement
 groupsRouter.use("/:id/activity", requireGroupRole("MEMBER"), activityRouter);
 groupsRouter.use("/:id", requireGroupRole("MEMBER"), balancesRouter);
 groupsRouter.use("/:id", requireGroupRole("MEMBER"), exportRouter);
+groupsRouter.use(
+  "/:id/recurring-expenses",
+  requireGroupRole("MEMBER"),
+  groupRecurringExpensesRouter,
+);

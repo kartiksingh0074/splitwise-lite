@@ -12,6 +12,7 @@ import { groupsRouter } from "./modules/groups/routes.js";
 import { inviteRouter } from "./modules/groups/inviteRoutes.js";
 import { expenseRouter } from "./modules/expenses/routes.js";
 import { settlementRouter } from "./modules/settlements/routes.js";
+import { recurringExpenseRouter } from "./modules/recurringExpenses/routes.js";
 
 export function createApp() {
   const app = express();
@@ -44,6 +45,7 @@ export function createApp() {
   app.use("/api/v1/invites", inviteRouter);
   app.use("/api/v1/expenses", expenseRouter);
   app.use("/api/v1/settlements", settlementRouter);
+  app.use("/api/v1/recurring-expenses", recurringExpenseRouter);
 
   app.use((req, res) => {
     res.status(404).json({

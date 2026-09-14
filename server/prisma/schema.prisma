@@ -10,27 +10,28 @@ datasource db {
 }
 
 model User {
-  id           String    @id @db.Uuid
-  email        String    @unique @db.Citext
+  id           String   @id @db.Uuid
+  email        String   @unique @db.Citext
   name         String
   passwordHash String
   avatarUrl    String?
-  createdAt    DateTime  @default(now())
+  createdAt    DateTime @default(now())
 
-  refreshTokens        RefreshToken[]
-  groupsCreated        Group[]
-  groupMemberships     GroupMember[]
-  groupInvitesCreated  GroupInvite[]  @relation("GroupInviteCreatedBy")
-  groupInvitesUsed     GroupInvite[]  @relation("GroupInviteUsedBy")
-  expensesCreated      Expense[]      @relation("ExpenseCreatedBy")
-  expensePayments      ExpensePayer[] @relation("ExpensePayerUser")
-  expenseShares        ExpenseSplit[] @relation("ExpenseSplitUser")
-  ledgerEntries        LedgerEntry[]  @relation("LedgerEntryUser")
-  ledgerCounterparty   LedgerEntry[]  @relation("LedgerEntryCounterparty")
-  activities           Activity[]     @relation("ActivityActor")
-  settlementsPaid      Settlement[]   @relation("SettlementFromUser")
-  settlementsReceived  Settlement[]   @relation("SettlementToUser")
-  settlementsCreated   Settlement[]   @relation("SettlementCreatedBy")
+  refreshTokens            RefreshToken[]
+  groupsCreated            Group[]
+  groupMemberships         GroupMember[]
+  groupInvitesCreated      GroupInvite[]      @relation("GroupInviteCreatedBy")
+  groupInvitesUsed         GroupInvite[]      @relation("GroupInviteUsedBy")
+  expensesCreated          Expense[]          @relation("ExpenseCreatedBy")
+  expensePayments          ExpensePayer[]     @relation("ExpensePayerUser")
+  expenseShares            ExpenseSplit[]     @relation("ExpenseSplitUser")
+  ledgerEntries            LedgerEntry[]      @relation("LedgerEntryUser")
+  ledgerCounterparty       LedgerEntry[]      @relation("LedgerEntryCounterparty")
+  activities               Activity[]         @relation("ActivityActor")
+  settlementsPaid          Settlement[]       @relation("SettlementFromUser")
+  settlementsReceived      Settlement[]       @relation("SettlementToUser")
+  settlementsCreated       Settlement[]       @relation("SettlementCreatedBy")
+  recurringExpensesCreated RecurringExpense[] @relation("RecurringExpenseCreatedBy")
 }
 
 model RefreshToken {
@@ -59,12 +60,13 @@ model Group {
   createdAt    DateTime  @default(now())
   archivedAt   DateTime?
 
-  members       GroupMember[]
-  invites       GroupInvite[]
-  expenses      Expense[]
-  ledgerEntries LedgerEntry[]
-  activities    Activity[]
-  settlements   Settlement[]
+  members           GroupMember[]
+  invites           GroupInvite[]
+  expenses          Expense[]
+  ledgerEntries     LedgerEntry[]
+  activities        Activity[]
+  settlements       Settlement[]
+  recurringExpenses RecurringExpense[]
 }
 
 model GroupMember {
@@ -80,16 +82,16 @@ model GroupMember {
 }
 
 model GroupInvite {
-  id          String    @id @db.Uuid
-  groupId     String    @db.Uuid
-  group       Group     @relation(fields: [groupId], references: [id])
-  code        String    @unique
-  createdById String    @db.Uuid
-  createdBy   User      @relation("GroupInviteCreatedBy", fields: [createdById], references: [id])
+  id          String   @id @db.Uuid
+  groupId     String   @db.Uuid
+  group       Group    @relation(fields: [groupId], references: [id])
+  code        String   @unique
+  createdById String   @db.Uuid
+  createdBy   User     @relation("GroupInviteCreatedBy", fields: [createdById], references: [id])
   expiresAt   DateTime
-  usedById    String?   @db.Uuid
-  usedBy      User?     @relation("GroupInviteUsedBy", fields: [usedById], references: [id])
-  createdAt   DateTime  @default(now())
+  usedById    String?  @db.Uuid
+  usedBy      User?    @relation("GroupInviteUsedBy", fields: [usedById], references: [id])
+  createdAt   DateTime @default(now())
 
   @@index([groupId])
 }
@@ -215,5 +217,34 @@ model Settlement {
   idempotencyKey  String           @unique
   createdAt       DateTime         @default(now())
 
+  @@index([groupId])
+}
+
+enum RecurrenceInterval {
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
+
+model RecurringExpense {
+  id            String             @id @db.Uuid
+  groupId       String             @db.Uuid
+  group         Group              @relation(fields: [groupId], references: [id])
+  description   String
+  category      String?
+  currency      String             @db.Char(3)
+  amountMinor   BigInt
+  splitType     SplitType
+  splitsPayload Json
+  payersPayload Json
+  interval      RecurrenceInterval
+  nextRunAt     DateTime
+  active        Boolean            @default(true)
+  createdById   String             @db.Uuid
+  createdBy     User               @relation("RecurringExpenseCreatedBy", fields: [createdById], references: [id])
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@index([active, nextRunAt])
   @@index([groupId])
 }

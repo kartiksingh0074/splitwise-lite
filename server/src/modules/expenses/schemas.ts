@@ -1,13 +1,13 @@
 import { z } from "zod";
 
-const decimalAmount = z.string().regex(/^\d+(\.\d+)?$/, "Must be a non-negative decimal amount");
+export const decimalAmount = z.string().regex(/^\d+(\.\d+)?$/, "Must be a non-negative decimal amount");
 
-const splitInputSchema = z.object({
+export const splitInputSchema = z.object({
   userId: z.string().uuid(),
   input: z.string().optional(),
 });
 
-const payerInputSchema = z.object({
+export const payerInputSchema = z.object({
   userId: z.string().uuid(),
   amount: decimalAmount.optional(),
 });
