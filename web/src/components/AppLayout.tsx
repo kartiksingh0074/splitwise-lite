@@ -23,7 +23,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
+      <header className="print:hidden flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
         <nav className="flex items-center gap-4 text-sm">
           <NavLink to="/" end className={navLinkClass}>
             Home
@@ -40,7 +40,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
         </div>
       </header>
       <main>{children}</main>
-      <ToastContainer />
+      <div className="print:hidden">
+        <ToastContainer />
+      </div>
     </div>
   );
 }

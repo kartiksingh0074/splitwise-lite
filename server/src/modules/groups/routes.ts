@@ -9,6 +9,7 @@ import { groupExpensesRouter } from "../expenses/routes.js";
 import { balancesRouter } from "../balances/routes.js";
 import { groupSettlementsRouter } from "../settlements/routes.js";
 import { activityRouter } from "../activity/routes.js";
+import { exportRouter } from "../export/routes.js";
 
 export const groupsRouter = Router();
 
@@ -81,3 +82,4 @@ groupsRouter.use("/:id/expenses", requireGroupRole("MEMBER"), groupExpensesRoute
 groupsRouter.use("/:id/settlements", requireGroupRole("MEMBER"), groupSettlementsRouter);
 groupsRouter.use("/:id/activity", requireGroupRole("MEMBER"), activityRouter);
 groupsRouter.use("/:id", requireGroupRole("MEMBER"), balancesRouter);
+groupsRouter.use("/:id", requireGroupRole("MEMBER"), exportRouter);

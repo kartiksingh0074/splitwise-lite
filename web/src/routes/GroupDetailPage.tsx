@@ -16,6 +16,7 @@ import {
   type Settlement,
 } from "../features/settlements/api.ts";
 import { listActivity, type ActivityEntry } from "../features/activity/api.ts";
+import { getExportCsvBlobUrl } from "../features/export/api.ts";
 import { PageSkeleton } from "../components/Skeleton.tsx";
 import { activityLink, formatActivityLabel, formatDayHeading, groupByDay } from "../features/activity/format.ts";
 import { friendlyErrorMessage } from "../lib/errorMessages.ts";
@@ -141,6 +142,21 @@ export function GroupDetailPage() {
     }
   };
 
+  const handleExportCsv = async () => {
+    if (!id || !group) return;
+    try {
+      const url = await getExportCsvBlobUrl(id);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${group.name}-ledger.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(friendlyErrorMessage(err));
+      showErrorToast(err);
+    }
+  };
+
   const handleCreateInvite = async () => {
     if (!id) return;
     try {
@@ -215,10 +231,20 @@ export function GroupDetailPage() {
             <span className="text-sm font-normal text-slate-500">({group.baseCurrency})</span>
           </h1>
         )}
-        {isOwner && !renaming && (
-          <button onClick={() => setRenaming(true)} className="text-sm text-slate-600 underline">
-            Rename
-          </button>
+        {!renaming && (
+          <div className="flex items-center gap-3">
+            <button onClick={handleExportCsv} className="text-sm text-slate-600 underline">
+              Export CSV
+            </button>
+            <Link to={`/groups/${id}/export-print`} className="text-sm text-slate-600 underline">
+              Print / PDF
+            </Link>
+            {isOwner && (
+              <button onClick={() => setRenaming(true)} className="text-sm text-slate-600 underline">
+                Rename
+              </button>
+            )}
+          </div>
         )}
       </div>
 

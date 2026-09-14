@@ -324,6 +324,21 @@ actually changed.
 
 **Response `200`** `{ activities: [{ id, type, entityType, entityId, actorId, actorName, payload, createdAt }], nextCursor: string | null }`
 
+### `GET /groups/:id/export.csv`
+
+Requires membership (any role). Returns the group's full, unpaginated ledger as a CSV file — an
+"Expenses" section (one row per non-deleted `Expense`, chronological by `paidAt`, with payers and
+splits flattened into `Name: amount` sub-fields joined by `; `) followed by a "Settlements"
+section (one row per `Settlement`, chronological by `settledAt`, including all statuses). Free-text
+fields (`description`, `category`, `note`) are RFC 4180-escaped by a small hand-rolled writer
+(`src/lib/csv.ts`) — no new dependency, per project.md rule #5. PDF export is intentionally *not*
+generated server-side; the frontend's `/groups/:id/export-print` page renders a print-styled view
+instead, saved to PDF via the browser's native Print dialog.
+
+**Response `200`** `text/csv`, `Content-Disposition: attachment; filename="<group-slug>-ledger-<date>.csv"`
+
+Errors: `404 NOT_FOUND` (non-members).
+
 ## Error codes reference
 
 | Code | Status | Where |

@@ -56,6 +56,22 @@ export function listExpenses(groupId: string, cursor?: string) {
   );
 }
 
+/** Pages through listExpenses with limit=100 until exhausted -- for full-list views like export-print. */
+export async function listAllExpenses(groupId: string): Promise<Expense[]> {
+  const all: Expense[] = [];
+  let cursor: string | undefined;
+  do {
+    const qs = cursor ? `?limit=100&cursor=${encodeURIComponent(cursor)}` : "?limit=100";
+    const page = await apiFetch<{ expenses: Expense[]; nextCursor: string | null }>(
+      `/groups/${groupId}/expenses${qs}`,
+      { method: "GET" },
+    );
+    all.push(...page.expenses);
+    cursor = page.nextCursor ?? undefined;
+  } while (cursor);
+  return all;
+}
+
 export function createExpense(groupId: string, input: ExpenseWriteInput) {
   return apiFetch<Expense>(`/groups/${groupId}/expenses`, {
     method: "POST",

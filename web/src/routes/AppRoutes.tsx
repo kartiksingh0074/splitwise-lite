@@ -5,6 +5,7 @@ import { ProtectedRoute } from "../components/ProtectedRoute.tsx";
 import { CreateGroupPage } from "./CreateGroupPage.tsx";
 import { ExpenseFormPage } from "./ExpenseFormPage.tsx";
 import { GroupDetailPage } from "./GroupDetailPage.tsx";
+import { GroupExportPrintPage } from "./GroupExportPrintPage.tsx";
 import { GroupsListPage } from "./GroupsListPage.tsx";
 import { HomePage } from "./HomePage.tsx";
 import { LoginPage } from "./LoginPage.tsx";
@@ -77,6 +78,14 @@ export function AppRoutes() {
         element={
           <Authenticated>
             <SettleUpPage />
+          </Authenticated>
+        }
+      />
+      <Route
+        path="/groups/:id/export-print"
+        element={
+          <Authenticated>
+            <GroupExportPrintPage />
           </Authenticated>
         }
       />

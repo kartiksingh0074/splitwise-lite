@@ -373,6 +373,16 @@ export async function listExpenses(groupId: string, query: ListQuery) {
   return { expenses: page.map(toPublicExpense), nextCursor };
 }
 
+/** Unpaginated variant for CSV export -- same shape/filter as listExpenses, chronological order. */
+export async function listAllExpenses(groupId: string) {
+  const rows = await prisma.expense.findMany({
+    where: { groupId, deletedAt: null },
+    include: EXPENSE_INCLUDE,
+    orderBy: [{ paidAt: "asc" }, { id: "asc" }],
+  });
+  return rows.map(toPublicExpense);
+}
+
 type ExpenseFieldChange = { before: string | null; after: string | null };
 
 /** Before/after diff of Expense's own scalar fields (not the payer/split composition). */
