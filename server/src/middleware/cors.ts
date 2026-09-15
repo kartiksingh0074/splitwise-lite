@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from "express";
 import { env } from "../config/env.js";
 
-const allowedOrigins = env.CORS_ALLOWED_ORIGINS
+export const allowedOrigins = env.CORS_ALLOWED_ORIGINS
   ? env.CORS_ALLOWED_ORIGINS.split(",").map((origin) => origin.trim())
   : [env.WEB_ORIGIN];
 

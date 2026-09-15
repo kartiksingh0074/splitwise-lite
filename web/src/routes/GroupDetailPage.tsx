@@ -17,6 +17,7 @@ import {
 } from "../features/settlements/api.ts";
 import { listActivity, type ActivityEntry } from "../features/activity/api.ts";
 import { getExportCsvBlobUrl } from "../features/export/api.ts";
+import { connectGroupSocket } from "../lib/realtime.ts";
 import {
   deleteRecurringExpense,
   listRecurringExpenses,
@@ -132,6 +133,11 @@ export function GroupDetailPage() {
     if (tab === "Balances") loadBalances();
     if (tab === "Activity") loadActivity();
   }, [tab, id]);
+
+  useEffect(() => {
+    if (!id) return;
+    return connectGroupSocket(id, loadBalances);
+  }, [id]);
 
   const isOwner = group?.members.some((m) => m.userId === userId && m.role === "OWNER") ?? false;
 

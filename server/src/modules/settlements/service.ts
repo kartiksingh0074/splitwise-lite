@@ -3,6 +3,7 @@ import type { z } from "zod";
 import { prisma } from "../../db/client.js";
 import { uuidv7 } from "../../lib/id.js";
 import { recordActivity } from "../../lib/activity.js";
+import { broadcastGroupChanged } from "../../lib/realtime.js";
 import { ApiError } from "../../middleware/errorHandler.js";
 import { env } from "../../config/env.js";
 import { formatMinor, parseMinor } from "../../domain/money.js";
@@ -265,6 +266,7 @@ export async function confirmSettlement(settlementId: string, actorId: string) {
     throw new ApiError(403, "FORBIDDEN", "Only the receiver can confirm a settlement.");
   }
   await prisma.$transaction((tx) => performConfirm(tx, settlementId, actorId));
+  broadcastGroupChanged(settlement.groupId);
   return getSettlement(settlementId, actorId);
 }
 

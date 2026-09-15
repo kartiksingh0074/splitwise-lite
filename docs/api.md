@@ -403,6 +403,27 @@ settlements have persisted receipts, from an earlier phase).
 
 Errors: `401 UNAUTHORIZED`, `422 INVALID_RECEIPT` (wrong type or over the 5MB limit).
 
+### `GET /ws` (WebSocket upgrade)
+
+Real-time, signal-only channel for a single group: when a member adds/edits/deletes an expense
+or confirms a settlement, every other open socket subscribed to that group receives
+`{ "type": "group_changed", "groupId": "..." }` — clients react by re-fetching via the normal
+REST routes (`GET /groups/:id/balances`, `GET /groups/:id/settle-plan`), never by trusting a
+payload pushed over the socket. There is no data on this channel beyond the signal itself.
+
+Browsers' native `WebSocket` API can't set an `Authorization` header on the handshake, so auth
+travels as a query param instead: connect to `/api/v1/ws?groupId=<id>&token=<accessToken>`. The
+server verifies the token and active group membership once, at connect time — a bad/missing
+token closes the socket with code `4001`; a non-member (or non-existent group) closes it with
+`4004`; a disallowed `Origin` header closes it with `4003`. On success, the server immediately
+sends `{ "type": "subscribed", "groupId": "..." }` once the handshake has actually finished
+(distinct from the WebSocket `open` event, which only confirms the HTTP upgrade itself completed).
+
+**Not re-verified after connecting** — a socket stays open across token expiry, and the server
+doesn't push a "reconnect" signal if the connection drops; a client that wants guaranteed delivery
+should still poll or refetch on its own schedule. This is a best-effort live-update channel, not
+the source of truth.
+
 ## Error codes reference
 
 | Code | Status | Where |

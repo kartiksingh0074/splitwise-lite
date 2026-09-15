@@ -3,6 +3,7 @@ import type { z } from "zod";
 import { prisma } from "../../db/client.js";
 import { uuidv7 } from "../../lib/id.js";
 import { recordActivity } from "../../lib/activity.js";
+import { broadcastGroupChanged } from "../../lib/realtime.js";
 import { ApiError } from "../../middleware/errorHandler.js";
 import { formatMinor, parseMinor } from "../../domain/money.js";
 import { computeSplit, SplitError } from "../../domain/split.js";
@@ -340,6 +341,7 @@ export async function createExpense(groupId: string, actorId: string, input: Exp
     });
   });
 
+  broadcastGroupChanged(groupId);
   return getExpense(expenseId, actorId);
 }
 
@@ -511,6 +513,7 @@ export async function updateExpense(
     });
   });
 
+  broadcastGroupChanged(expense.groupId);
   return getExpense(expenseId, actorId);
 }
 
@@ -532,4 +535,6 @@ export async function deleteExpense(expenseId: string, actorId: string) {
       payload: { description: expense.description },
     });
   });
+
+  broadcastGroupChanged(expense.groupId);
 }
