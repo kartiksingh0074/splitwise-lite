@@ -193,6 +193,7 @@ async function seed() {
     amount: "500.00",
     currency: "INR",
     note: "Cash handed over at the hotel",
+    method: "CASH",
   });
   await confirmSettlement(confirmed.id, alice.id);
 
@@ -200,6 +201,7 @@ async function seed() {
     toUserId: alice.id,
     amount: "25.00",
     currency: "USD",
+    method: "CASH",
   });
 
   console.log("Seed complete:");

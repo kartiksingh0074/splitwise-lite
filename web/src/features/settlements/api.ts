@@ -1,6 +1,7 @@
 import { apiFetch, apiFetchBlob } from "../../lib/api.ts";
 
 export type SettlementStatus = "PENDING" | "CONFIRMED" | "REJECTED";
+export type SettlementMethod = "CASH" | "GATEWAY";
 
 export interface Settlement {
   id: string;
@@ -16,6 +17,9 @@ export interface Settlement {
   fxRateToBase: string;
   note: string | null;
   hasReceipt: boolean;
+  method: SettlementMethod;
+  paymentLinkId: string | null;
+  paymentLink: string | null;
   status: SettlementStatus;
   settledAt: string;
   createdById: string;
@@ -28,6 +32,7 @@ export interface CreateSettlementInput {
   currency?: string;
   note?: string;
   settledAt?: string;
+  method?: SettlementMethod;
 }
 
 export function listSettlements(groupId: string) {
@@ -64,4 +69,12 @@ export function uploadReceipt(settlementId: string, file: File) {
 export async function getReceiptBlobUrl(settlementId: string): Promise<string> {
   const blob = await apiFetchBlob(`/settlements/${settlementId}/receipt`, { method: "GET" });
   return URL.createObjectURL(blob);
+}
+
+export function getPaymentByLink(paymentLinkId: string) {
+  return apiFetch<Settlement>(`/payments/${paymentLinkId}`, { method: "GET" });
+}
+
+export function completePayment(paymentLinkId: string) {
+  return apiFetch<Settlement>(`/payments/${paymentLinkId}/complete`, { method: "POST" });
 }

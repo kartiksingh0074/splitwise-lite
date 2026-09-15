@@ -196,6 +196,11 @@ enum SettlementStatus {
   REJECTED
 }
 
+enum SettlementMethod {
+  CASH
+  GATEWAY
+}
+
 model Settlement {
   id              String           @id @db.Uuid
   groupId         String           @db.Uuid
@@ -210,6 +215,8 @@ model Settlement {
   amountBaseMinor BigInt
   note            String?
   receiptUrl      String?
+  method          SettlementMethod @default(CASH)
+  paymentLinkId   String?          @unique
   status          SettlementStatus @default(PENDING)
   settledAt       DateTime
   createdById     String           @db.Uuid

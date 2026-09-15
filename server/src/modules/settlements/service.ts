@@ -61,6 +61,9 @@ function toPublicSettlement(s: SettlementWithRelations) {
     fxRateToBase: s.fxRateToBase.toString(),
     note: s.note,
     hasReceipt: s.receiptUrl !== null,
+    method: s.method,
+    paymentLinkId: s.paymentLinkId,
+    paymentLink: s.paymentLinkId ? `${env.WEB_ORIGIN}/pay/${s.paymentLinkId}` : null,
     status: s.status,
     settledAt: s.settledAt,
     createdById: s.createdById,
@@ -195,6 +198,7 @@ export async function createSettlement(
 
   const settlementId = uuidv7();
   const settledAt = input.settledAt ? new Date(input.settledAt) : new Date();
+  const paymentLinkId = input.method === "GATEWAY" ? uuidv7() : null;
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -209,6 +213,8 @@ export async function createSettlement(
           fxRateToBase: formatRateForStorage(rateScaled),
           amountBaseMinor,
           note: input.note,
+          method: input.method,
+          paymentLinkId,
           status: "PENDING",
           settledAt,
           createdById: actorId,
@@ -277,6 +283,36 @@ export async function rejectSettlement(settlementId: string, actorId: string) {
   }
   await prisma.$transaction((tx) => performReject(tx, settlementId, actorId));
   return getSettlement(settlementId, actorId);
+}
+
+async function loadSettlementByPaymentLink(paymentLinkId: string, actorId: string) {
+  const settlement = await prisma.settlement.findUnique({ where: { paymentLinkId } });
+  if (!settlement) {
+    throw new ApiError(404, "NOT_FOUND", "Payment link not found.");
+  }
+  if (settlement.fromUserId !== actorId) {
+    throw new ApiError(403, "FORBIDDEN", "Only the payer can access this payment link.");
+  }
+  return settlement;
+}
+
+/** Simulated gateway checkout page's own data load -- refresh/deep-link-safe, payer-only. */
+export async function getPaymentByLink(paymentLinkId: string, actorId: string) {
+  const settlement = await loadSettlementByPaymentLink(paymentLinkId, actorId);
+  return getSettlement(settlement.id, actorId);
+}
+
+/**
+ * Simulated gateway webhook/callback: reaches the same CONFIRMED state as the receiver's manual
+ * confirm, via the same performConfirm helper (same row-lock, same 409 if already resolved) --
+ * just authorized by the payer instead of the receiver, since a real gateway's webhook is the
+ * trusted confirmation source, not the receiver's say-so.
+ */
+export async function completeGatewayPayment(paymentLinkId: string, actorId: string) {
+  const settlement = await loadSettlementByPaymentLink(paymentLinkId, actorId);
+  await prisma.$transaction((tx) => performConfirm(tx, settlement.id, actorId));
+  broadcastGroupChanged(settlement.groupId);
+  return getSettlement(settlement.id, actorId);
 }
 
 export async function uploadReceipt(

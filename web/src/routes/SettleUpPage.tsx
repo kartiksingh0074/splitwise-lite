@@ -1,7 +1,11 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { getGroup, type GroupMemberInfo } from "../features/groups/api.ts";
-import { createSettlement, uploadReceipt } from "../features/settlements/api.ts";
+import {
+  createSettlement,
+  uploadReceipt,
+  type SettlementMethod,
+} from "../features/settlements/api.ts";
 import { friendlyErrorMessage } from "../lib/errorMessages.ts";
 import { useAuthStore } from "../stores/authStore.ts";
 import { showErrorToast } from "../stores/toastStore.ts";
@@ -23,6 +27,7 @@ export function SettleUpPage() {
   const [toUserId, setToUserId] = useState(prefill.toUserId ?? "");
   const [amount, setAmount] = useState(prefill.amount ?? "");
   const [note, setNote] = useState("");
+  const [method, setMethod] = useState<SettlementMethod>("CASH");
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -60,11 +65,20 @@ export function SettleUpPage() {
 
     setSubmitting(true);
     try {
-      const settlement = await createSettlement(groupId, { toUserId, amount, note: note || undefined });
+      const settlement = await createSettlement(groupId, {
+        toUserId,
+        amount,
+        note: note || undefined,
+        method,
+      });
       if (receiptFile) {
         await uploadReceipt(settlement.id, receiptFile);
       }
-      navigate(`/groups/${groupId}`);
+      if (settlement.method === "GATEWAY" && settlement.paymentLinkId) {
+        navigate(`/pay/${settlement.paymentLinkId}`);
+      } else {
+        navigate(`/groups/${groupId}`);
+      }
     } catch (err) {
       setError(friendlyErrorMessage(err));
       showErrorToast(err);
@@ -114,6 +128,35 @@ export function SettleUpPage() {
             placeholder="20.00"
             className="rounded border border-slate-300 px-3 py-2"
           />
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <span className="text-sm text-slate-700">How are you paying?</span>
+          <div className="flex gap-2 text-sm">
+            <button
+              type="button"
+              onClick={() => setMethod("CASH")}
+              className={`rounded px-2 py-1 ${
+                method === "CASH" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700"
+              }`}
+            >
+              Cash
+            </button>
+            <button
+              type="button"
+              onClick={() => setMethod("GATEWAY")}
+              className={`rounded px-2 py-1 ${
+                method === "GATEWAY" ? "bg-slate-900 text-white" : "bg-slate-100 text-slate-700"
+              }`}
+            >
+              UPI / Card (simulated)
+            </button>
+          </div>
+          {method === "GATEWAY" && (
+            <p className="text-xs text-slate-500">
+              You'll be taken to a simulated checkout page — no real payment is processed.
+            </p>
+          )}
         </div>
 
         <div className="flex flex-col gap-1">

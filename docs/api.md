@@ -258,11 +258,20 @@ as having paid, never on someone else's behalf. `currency` defaults to the group
 if omitted. `PENDING` on creation; does not touch the ledger until confirmed. Retrying the exact
 same `Idempotency-Key` returns the original settlement rather than creating a second one.
 
+`method` (`"CASH"` default, or `"GATEWAY"`) controls whether this is a plain cash-handoff record
+or a **simulated** payment-gateway flow (project.md §7 — no real Razorpay/UPI integration, no
+money moves) — `GATEWAY` additionally generates a `paymentLinkId`/`paymentLink`, which the payer
+visits to "complete" the payment via `POST /payments/:paymentLinkId/complete`, reaching
+`CONFIRMED` the same way the receiver's manual confirm does. Either method still supports the
+receiver manually confirming/rejecting — `GATEWAY` adds a second path to `CONFIRMED`, it doesn't
+replace the first.
+
 **Header** `Idempotency-Key: <client-generated key>` — required.
 
-**Body** `{ toUserId, amount, currency?, note?, settledAt? }`
+**Body** `{ toUserId, amount, currency?, note?, settledAt?, method? }`
 
-**Response `201`** a `Settlement` — `{ id, groupId, fromUserId, fromUserName, toUserId, toUserName, currency, amount, baseCurrency, amountBase, fxRateToBase, note, hasReceipt, status, settledAt, createdById, createdAt }`
+**Response `201`** a `Settlement` — `{ id, groupId, fromUserId, fromUserName, toUserId, toUserName, currency, amount, baseCurrency, amountBase, fxRateToBase, note, hasReceipt, method, paymentLinkId, paymentLink, status, settledAt, createdById, createdAt }`
+— `paymentLinkId`/`paymentLink` are `null` for `method: "CASH"`.
 
 Errors: `400 IDEMPOTENCY_KEY_REQUIRED`, `422 INVALID_PARTICIPANT` (recipient not an active member),
 `422 UNSUPPORTED_CURRENCY`, `422 VALIDATION_ERROR`.
@@ -308,6 +317,30 @@ membership check on every read; there is no static-file path serving uploads dir
 **Response `200`** the raw image bytes, with the correct `Content-Type`.
 
 Errors: `404 NOT_FOUND`, `404 RECEIPT_NOT_FOUND` (no receipt uploaded, or the file is missing).
+
+### `GET /payments/:paymentLinkId`
+
+Requires being the settlement's `fromUserId` (the payer) — this is the simulated checkout page's
+own data load, so it's deliberately refresh/deep-link-safe rather than relying on anything passed
+through frontend navigation state. Only exists for `method: "GATEWAY"` settlements.
+
+**Response `200`** a `Settlement` (same shape as `POST /groups/:id/settlements`).
+
+Errors: `403 FORBIDDEN` (not the payer), `404 NOT_FOUND` (unknown link).
+
+### `POST /payments/:paymentLinkId/complete`
+
+Requires being the payer. The simulated gateway's "webhook" — reaches `CONFIRMED` via the exact
+same row-locked transaction and ledger writes as the receiver's manual confirm
+(`POST /settlements/:id/confirm`), just authorized by the payer instead of the receiver, since a
+real gateway's webhook is the trusted confirmation source rather than taking the receiver's word
+for it. Safe to call once: the row-lock means a settlement already confirmed or rejected (by
+either path) 409s instead of double-writing ledger entries.
+
+**Response `200`** the updated `Settlement`.
+
+Errors: `403 FORBIDDEN` (not the payer), `404 NOT_FOUND` (unknown link),
+`409 SETTLEMENT_NOT_PENDING` (already confirmed or rejected).
 
 ### `GET /groups/:id/activity`
 

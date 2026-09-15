@@ -10,4 +10,5 @@ export const createSettlementSchema = z.object({
     .optional(),
   note: z.string().max(500).optional(),
   settledAt: z.string().datetime().optional(),
+  method: z.enum(["CASH", "GATEWAY"]).default("CASH"),
 });

@@ -9,6 +9,7 @@ import { GroupExportPrintPage } from "./GroupExportPrintPage.tsx";
 import { GroupsListPage } from "./GroupsListPage.tsx";
 import { HomePage } from "./HomePage.tsx";
 import { LoginPage } from "./LoginPage.tsx";
+import { PaymentCheckoutPage } from "./PaymentCheckoutPage.tsx";
 import { RegisterPage } from "./RegisterPage.tsx";
 import { SettleUpPage } from "./SettleUpPage.tsx";
 import { SimplifyExplainPage } from "./SimplifyExplainPage.tsx";
@@ -95,6 +96,14 @@ export function AppRoutes() {
         element={
           <Authenticated>
             <SimplifyExplainPage />
+          </Authenticated>
+        }
+      />
+      <Route
+        path="/pay/:paymentLinkId"
+        element={
+          <Authenticated>
+            <PaymentCheckoutPage />
           </Authenticated>
         }
       />
