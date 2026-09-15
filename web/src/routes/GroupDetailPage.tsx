@@ -540,6 +540,12 @@ export function GroupDetailPage() {
                 >
                   Direct
                 </button>
+                <Link
+                  to={`/groups/${id}/simplify-explain`}
+                  className="rounded bg-slate-100 px-2 py-1 text-slate-700"
+                >
+                  Explain
+                </Link>
               </div>
             </div>
 

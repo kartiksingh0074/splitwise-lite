@@ -11,6 +11,7 @@ import { HomePage } from "./HomePage.tsx";
 import { LoginPage } from "./LoginPage.tsx";
 import { RegisterPage } from "./RegisterPage.tsx";
 import { SettleUpPage } from "./SettleUpPage.tsx";
+import { SimplifyExplainPage } from "./SimplifyExplainPage.tsx";
 
 function Authenticated({ children }: { children: ReactNode }) {
   return (
@@ -86,6 +87,14 @@ export function AppRoutes() {
         element={
           <Authenticated>
             <GroupExportPrintPage />
+          </Authenticated>
+        }
+      />
+      <Route
+        path="/groups/:id/simplify-explain"
+        element={
+          <Authenticated>
+            <SimplifyExplainPage />
           </Authenticated>
         }
       />
