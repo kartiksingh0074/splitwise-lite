@@ -386,6 +386,23 @@ already materialized are real, independent `Expense` rows and are unaffected.
 
 Errors: `403 FORBIDDEN`, `404 NOT_FOUND`.
 
+### `POST /ocr/receipt`
+
+Requires auth. Rate limited (5/min/IP — OCR recognition is CPU-heavy). Runs
+[tesseract.js](https://github.com/naptha/tesseract.js) against an uploaded receipt image and
+returns the recognized text plus best-guess `amount`/`merchant` fields via simple heuristics
+(`src/domain/receiptParsing.ts`: prefers a currency-like number on a line mentioning
+"total"/"amount due"/"balance due", falling back to the largest number found; the merchant is the
+first non-blank line). This is a **best-effort prefill utility for the expense-creation form** —
+nothing is stored server-side, and there is no receipt-attachment feature for expenses (only
+settlements have persisted receipts, from an earlier phase).
+
+**Body** `multipart/form-data` with a `receipt` file field.
+
+**Response `200`** `{ rawText, guessedAmount: string | null, guessedMerchant: string | null }`
+
+Errors: `401 UNAUTHORIZED`, `422 INVALID_RECEIPT` (wrong type or over the 5MB limit).
+
 ## Error codes reference
 
 | Code | Status | Where |

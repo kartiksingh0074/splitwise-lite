@@ -21,6 +21,7 @@ import {
   createRecurringExpense,
   type RecurrenceInterval,
 } from "../features/recurringExpenses/api.ts";
+import { scanReceipt } from "../features/ocr/api.ts";
 
 const SPLIT_TYPES: SplitType[] = ["EQUAL", "EXACT", "PERCENT", "SHARES"];
 const RECURRENCE_INTERVALS: RecurrenceInterval[] = ["WEEKLY", "MONTHLY", "YEARLY"];
@@ -56,6 +57,7 @@ export function ExpenseFormPage() {
   const [loading, setLoading] = useState(true);
   const [recurring, setRecurring] = useState(false);
   const [recurrenceInterval, setRecurrenceInterval] = useState<RecurrenceInterval>("MONTHLY");
+  const [scanning, setScanning] = useState(false);
 
   const store = useExpenseFormStore();
 
@@ -63,6 +65,7 @@ export function ExpenseFormPage() {
     register,
     handleSubmit,
     reset,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<ScalarForm>({
     resolver: zodResolver(scalarSchema),
@@ -123,6 +126,24 @@ export function ExpenseFormPage() {
   }, [groupId, expenseId]);
 
   const remaining = selectRemainingToAllocate(store);
+
+  const handleScanReceipt = async (file: File) => {
+    setScanning(true);
+    try {
+      const result = await scanReceipt(file);
+      if (result.guessedMerchant) {
+        setValue("description", result.guessedMerchant);
+      }
+      if (result.guessedAmount) {
+        setValue("amount", result.guessedAmount);
+        store.setAmount(result.guessedAmount);
+      }
+    } catch (err) {
+      showErrorToast(err);
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const onSubmit = async (scalar: ScalarForm) => {
     setError(null);
@@ -228,6 +249,29 @@ export function ExpenseFormPage() {
       <h1 className="mb-6 text-xl font-semibold text-slate-900">
         {isEdit ? "Edit expense" : "Add expense"}
       </h1>
+
+      {!isEdit && (
+        <div className="mb-6 flex items-center gap-3 rounded-lg bg-white p-4 shadow">
+          <label className="cursor-pointer rounded bg-slate-100 px-3 py-1.5 text-sm text-slate-700">
+            {scanning ? "Scanning…" : "Scan receipt"}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              className="hidden"
+              disabled={scanning}
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) void handleScanReceipt(file);
+                e.target.value = "";
+              }}
+            />
+          </label>
+          <p className="text-xs text-slate-500">
+            Uploads a photo of a receipt and tries to prefill the description and amount below —
+            always double-check before saving.
+          </p>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-6">
         <div className="grid grid-cols-1 gap-4 rounded-lg bg-white p-6 shadow sm:grid-cols-2">

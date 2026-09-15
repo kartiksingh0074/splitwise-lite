@@ -14,6 +14,9 @@ server/prisma/migrations/**/migration.sql.bak
 # Local receipt uploads (dev StorageAdapter)
 server/uploads/
 
+# tesseract.js downloads its language data to the cwd on first use
+server/*.traineddata
+
 # Vite
 web/dist/
 
