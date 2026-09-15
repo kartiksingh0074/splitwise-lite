@@ -21,5 +21,10 @@ FROM node:20-alpine AS runtime
 WORKDIR /app
 RUN npm install -g serve@14
 COPY --from=build /app/web/dist ./dist
+# no-cache on index.html so a reload always picks up a freshly rebuilt bundle instead of an old
+# cached HTML pointing at JS/CSS chunk hashes that no longer exist after a rebuild; the hashed
+# assets themselves are safe to cache long-term since their filename changes when content does.
+# serve looks for serve.json inside the served folder itself, not the invoking cwd.
+COPY web/serve.json ./dist/serve.json
 EXPOSE 5173
 CMD ["serve", "-s", "dist", "-l", "5173"]
