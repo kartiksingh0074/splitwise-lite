@@ -19,8 +19,12 @@ export const useBalancesStore = create<BalancesState>((set) => ({
   setView: (view) => set({ view }),
 }));
 
+// Shared fallback: a selector must return a stable reference. A fresh `[]` on every call makes
+// Zustand v5 (useSyncExternalStore) see a changed snapshot each render and loop forever.
+const NO_TRANSFERS: PairwiseDebt[] = [];
+
 /** Which transfer list to render -- switching `view` is instant, no refetch. */
 export function selectDisplayedTransfers(state: BalancesState): PairwiseDebt[] {
-  if (state.view === "simplified") return state.settlePlan?.transfers ?? [];
-  return state.balances?.pairwise ?? [];
+  if (state.view === "simplified") return state.settlePlan?.transfers ?? NO_TRANSFERS;
+  return state.balances?.pairwise ?? NO_TRANSFERS;
 }

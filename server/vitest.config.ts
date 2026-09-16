@@ -4,7 +4,11 @@ export default defineConfig({
   test: {
     environment: "node",
     env: {
-      DATABASE_URL: "postgresql://splitwise:splitwise@localhost:5432/splitwise?schema=public",
+      // tests/setup.ts wipes every table before each test -- set TEST_DATABASE_URL to point the
+      // suite at a separate database so running it doesn't erase local dev/seed data.
+      DATABASE_URL:
+        process.env.TEST_DATABASE_URL ??
+        "postgresql://splitwise:splitwise@localhost:5432/splitwise?schema=public",
       NODE_ENV: "test",
       LOG_LEVEL: "silent",
       PORT: "4000",

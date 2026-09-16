@@ -34,9 +34,18 @@ export class RecurringExpenseScheduler {
   start(): void {
     if (this.timer) return;
     const intervalMs = this.options.intervalMs ?? 60 * 60 * 1000;
-    this.timer = setInterval(() => void this.tick(), intervalMs);
+    this.timer = setInterval(() => this.runTick(), intervalMs);
     this.timer.unref();
-    void this.tick();
+    this.runTick();
+  }
+
+  // Fire-and-forget entry point for the timer: a failure outside materialize() (e.g. the DB being
+  // unreachable during findMany) must be logged, not surface as an unhandled rejection that
+  // crashes the whole server process.
+  private runTick(): void {
+    this.tick().catch((err: unknown) => {
+      logger.error({ err }, "recurring expense scheduler tick failed, will retry next tick");
+    });
   }
 
   stop(): void {
